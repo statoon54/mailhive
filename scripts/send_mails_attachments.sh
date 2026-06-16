@@ -1,22 +1,47 @@
-#!/bin/bash
-# Variante de send_2000_mails.sh avec une PIÈCE JOINTE IDENTIQUE pour tous les
-# destinataires. Objectif : exercer la déduplication des pièces jointes
+#!/usr/bin/env bash
+# Script d'exemple : envoi en masse de mails avec une PIÈCE JOINTE IDENTIQUE pour
+# tous les destinataires. Objectif : exercer la déduplication des pièces jointes
 # (même contenu -> 1 seul blob stocké, N références).
 #
-# Usage : ./send_2000_mails_attachments.sh [NB_MAILS] [TAILLE_PJ_KO]
-#   NB_MAILS      : nombre de mails à envoyer (défaut 2000)
-#   TAILLE_PJ_KO  : taille de la pièce jointe en Ko (défaut 1024 = 1 Mo)
+# Usage :
+#   TEMPLATE_ID=<uuid> [API_KEY=<clé>] [BASE_URL=<url>] \
+#     ./scripts/send_mails_attachments.sh [NB_MAILS] [TAILLE_PJ_KO]
+#
+# Paramètres (variables d'environnement) :
+#   TEMPLATE_ID   (obligatoire) UUID du template à utiliser
+#   API_KEY       (défaut: admin-dev-key) clé API du TENANT émetteur — c'est elle
+#                 qui détermine le tenant (les mails sont créés sous ce tenant)
+#   BASE_URL      (défaut: http://localhost:8080) URL de base de l'API
+#
+# Arguments positionnels :
+#   NB_MAILS      (défaut 2000)        nombre de mails à envoyer
+#   TAILLE_PJ_KO  (défaut 1024 = 1 Mo) taille de la pièce jointe en Ko
+#
+# Exemple :
+#   TEMPLATE_ID=636ac3a6-122d-447e-805e-beb7b5c48d54 \
+#     ./scripts/send_mails_attachments.sh 500 2048
 
 set -u
 
-COUNT=${1:-2000}
-ATTACH_KB=${2:-1024}
+TEMPLATE_ID="${TEMPLATE_ID:?TEMPLATE_ID requis : UUID du template (voir en-tête du script)}"
+API_KEY="${API_KEY:-admin-dev-key}"
+BASE_URL="${BASE_URL:-http://localhost:8080}"
+
+COUNT="${1:-2000}"
+ATTACH_KB="${2:-1024}"
 PARALLEL=20
 
-TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/token -H "Content-Type: application/json" -d '{"api_key": "admin-dev-key"}' | jq -r '.data.token')
-TEMPLATE_ID="636ac3a6-122d-447e-805e-beb7b5c48d54"
 ATTACH_FILENAME="document.pdf"
 ATTACH_CONTENT_TYPE="application/pdf"
+
+# Authentification : le token (donc le tenant émetteur) découle de l'API_KEY.
+TOKEN=$(curl -s -X POST "$BASE_URL/api/v1/auth/token" \
+  -H "Content-Type: application/json" \
+  -d "{\"api_key\": \"$API_KEY\"}" | jq -r '.data.token')
+if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+  echo "Échec d'authentification (API_KEY=$API_KEY, BASE_URL=$BASE_URL)" >&2
+  exit 1
+fi
 
 # Répertoire de travail temporaire (corps des requêtes + pièce jointe).
 # Les corps de requête sont écrits dans des fichiers et envoyés via `curl -d @fichier`
@@ -31,6 +56,7 @@ echo "Génération de la pièce jointe (${ATTACH_KB} Ko)..."
 ATTACH_FILE="$WORKDIR/attachment.b64"
 head -c $((ATTACH_KB * 1024)) /dev/zero | base64 | tr -d '\n' > "$ATTACH_FILE"
 echo "Pièce jointe prête : $(wc -c < "$ATTACH_FILE") caractères base64."
+echo "Template: $TEMPLATE_ID — Tenant (via API_KEY): $API_KEY — Envoi de $COUNT mails."
 
 FIRST_NAMES=("Alice" "Bob" "Charlie" "Diana" "Emma" "Francois" "Gabriel" "Hannah" "Ines" "Julien" "Karim" "Laura" "Marie" "Nicolas" "Olivia" "Pierre" "Quentin" "Rachel" "Sophie" "Thomas")
 LAST_NAMES=("Martin" "Bernard" "Dubois" "Thomas" "Robert" "Richard" "Petit" "Durand" "Leroy" "Moreau" "Simon" "Laurent" "Lefebvre" "Michel" "Garcia" "David" "Bertrand" "Roux" "Vincent" "Fournier")
@@ -58,7 +84,7 @@ for i in $(seq 1 "$COUNT"); do
     } > "$BODY"
 
     curl -s -o /dev/null -w "[${i}] %{http_code}\n" \
-      -X POST http://localhost:8080/api/v1/mails \
+      -X POST "$BASE_URL/api/v1/mails" \
       -H "Content-Type: application/json" \
       -H "Authorization: Bearer ${TOKEN}" \
       --data-binary @"$BODY"
