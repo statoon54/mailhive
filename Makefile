@@ -89,7 +89,7 @@ docker-dev-s3:
 
 # Docker production : exécute l'image publiée (GHCR) avec pièces jointes sur S3.
 # Nécessite les secrets en environnement (JWT_SECRET, ENCRYPTION_KEY, etc.) —
-# voir docker-compose.prod.yml. Choix du tag : MAILHIVE_TAG=v1.2.3.
+# voir docker-compose.prod.yml. Choix du tag : MAILHIVE_TAG=1.2.3 (semver sans « v »).
 docker-prod:
 	docker compose -f docker-compose.prod.yml up -d
 

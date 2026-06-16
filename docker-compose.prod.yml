@@ -5,7 +5,8 @@
 # stockage des pièces jointes sur S3 (SeaweedFS auto-hébergé ci-dessous). Fichier
 # autonome : ne pas combiner avec docker-compose.yml.
 #
-#   MAILHIVE_TAG=v0.1.0 docker compose -f docker-compose.prod.yml up -d
+#   MAILHIVE_TAG=0.1.0 docker compose -f docker-compose.prod.yml up -d
+#   (le tag de l'image suit le semver sans préfixe « v » : 0.1.0, 0.1, latest)
 #
 # Secrets : fournir via un fichier .env ou l'environnement (NE PAS committer).
 # Les variables marquées `:?` sont obligatoires — le démarrage échoue sinon.
