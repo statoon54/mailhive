@@ -1,0 +1,20 @@
+# docker-compose.test.yml — Stack minimale pour les tests d'intégration SMTP.
+#
+# Usage :
+#   docker compose -f docker-compose.test.yml up -d
+#   MAILPIT_URL=http://localhost:8025 go test ./internal/adapter/mailer/... -tags=integration -v
+#   docker compose -f docker-compose.test.yml down
+services:
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8025/api/v1/info"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

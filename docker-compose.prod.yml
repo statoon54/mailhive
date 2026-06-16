@@ -1,0 +1,112 @@
+# =============================================================================
+# MailHive — déploiement de production
+#
+# Exécute l'IMAGE PUBLIÉE (GHCR) au lieu de construire depuis les sources, avec
+# stockage des pièces jointes sur S3 (SeaweedFS auto-hébergé ci-dessous). Fichier
+# autonome : ne pas combiner avec docker-compose.yml.
+#
+#   MAILHIVE_TAG=v0.1.0 docker compose -f docker-compose.prod.yml up -d
+#
+# Secrets : fournir via un fichier .env ou l'environnement (NE PAS committer).
+# Les variables marquées `:?` sont obligatoires — le démarrage échoue sinon.
+#
+# S3 externe (AWS S3, R2, MinIO managé) plutôt que SeaweedFS local : renseigner
+# BLOB_S3_ENDPOINT + identifiants, puis retirer le service `seaweedfs` et la
+# dépendance correspondante de `mailhive`.
+# =============================================================================
+
+services:
+  mailhive:
+    image: ${MAILHIVE_IMAGE:-ghcr.io/statoon54/mailhive}:${MAILHIVE_TAG:-latest}
+    pull_policy: always
+    ports:
+      - "8080:8080"
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: 8080
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-mailhive}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD requis}
+      DB_NAME: ${DB_NAME:-mailhive}
+      DB_SSL_MODE: ${DB_SSL_MODE:-disable}
+      DB_MAX_CONNS: ${DB_MAX_CONNS:-50}
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: 0
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET requis}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-24h}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:?ADMIN_API_KEY requis}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY requis (64 hex = 32 octets)}
+      DEFAULT_RATE_LIMIT: ${DEFAULT_RATE_LIMIT:-100}
+      DEFAULT_RATE_BURST: ${DEFAULT_RATE_BURST:-200}
+      SMTP_MODE: ${SMTP_MODE:-real}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-50}
+      # Pièces jointes sur S3. Par défaut : SeaweedFS auto-hébergé ci-dessous.
+      # Les identifiants doivent correspondre à docker/seaweedfs/s3.json
+      # (à faire tourner pour un vrai déploiement).
+      BLOB_BACKEND: s3
+      BLOB_S3_ENDPOINT: ${BLOB_S3_ENDPOINT:-seaweedfs:8333}
+      BLOB_S3_BUCKET: ${BLOB_S3_BUCKET:-mailhive-attachments}
+      BLOB_S3_ACCESS_KEY: ${BLOB_S3_ACCESS_KEY:-mailhive}
+      BLOB_S3_SECRET_KEY: ${BLOB_S3_SECRET_KEY:-mailhive_secret}
+      BLOB_S3_REGION: ${BLOB_S3_REGION:-us-east-1}
+      BLOB_S3_USE_SSL: ${BLOB_S3_USE_SSL:-false}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.mistral.ai}
+      LLM_MODEL: ${LLM_MODEL:-mistral-small-latest}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-mailhive}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD requis}
+      POSTGRES_DB: ${DB_NAME:-mailhive}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-mailhive}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: valkey/valkey:8-alpine
+    command: valkey-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    command: server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json -dir=/data
+    volumes:
+      - ./docker/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+      - seaweedfs_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8333/status"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  seaweedfs_data:

@@ -1,0 +1,11 @@
+{
+  "identities": [
+    {
+      "name": "mailhive",
+      "credentials": [
+        { "accessKey": "mailhive", "secretKey": "mailhive_secret" }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

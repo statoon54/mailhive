@@ -1,0 +1,1572 @@
+openapi: 3.0.3
+info:
+  title: MailHive API
+  description: |
+    API multi-tenant d'envoi et de gestion d'e-mails avec file d'attente asynchrone,
+    templates embarqués et chiffrement SMTP.
+  version: 1.0.0
+  contact:
+    name: Franck Paszkowski
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Serveur local
+
+tags:
+  - name: Auth
+    description: Authentification JWT
+  - name: Health
+    description: Vérification de santé
+  - name: Mails
+    description: Envoi et gestion des e-mails
+  - name: Templates
+    description: Templates d'e-mails réutilisables
+  - name: SMTP Configs
+    description: Configurations SMTP par tenant
+  - name: Branding
+    description: Personnalisation de l'application (titre, sous-titre, logo)
+  - name: Admin
+    description: Administration (rôle admin requis)
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ── Auth ──────────────────────────────────────────
+  /auth/token:
+    post:
+      tags: [Auth]
+      summary: Générer un token JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [api_key]
+              properties:
+                api_key:
+                  type: string
+                  description: Clé API du tenant ou de l'administrateur
+      responses:
+        "200":
+          description: Token généré
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Rafraîchir un token JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+                  description: Token JWT à rafraîchir
+      responses:
+        "200":
+          description: Nouveau token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── Health ────────────────────────────────────────
+  /health:
+    get:
+      tags: [Health]
+      summary: Vérification de santé (DB + Redis)
+      security: []
+      responses:
+        "200":
+          description: Tous les services sont opérationnels
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Un ou plusieurs services sont dégradés
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  # ── Mails ─────────────────────────────────────────
+  /mails:
+    post:
+      tags: [Mails]
+      summary: Créer et mettre en queue un ou plusieurs mails
+      description: |
+        Crée un mail et le met en file d'attente.
+
+        **Mode groupé** (par défaut, `individuel: false`) : crée 1 seul mail avec tous les destinataires TO.
+        La réponse est un objet `Mail`.
+
+        **Mode individuel** (`individuel: true`) : crée N mails distincts (1 par destinataire TO).
+        Chaque destinataire TO peut fournir un `template_data` spécifique qui sera fusionné avec
+        le `template_data` partagé (les clés spécifiques écrasent les clés partagées).
+        Les CC/BCC sont répliqués sur chaque mail. La réponse est un `CreateMailBatchResponse`.
+
+        Le nombre total de destinataires (TO + CC + BCC) est limité par `max_destinataires` du tenant.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMailRequest"
+            examples:
+              groupé:
+                summary: Envoi groupé classique
+                value:
+                  template_id: "uuid-template"
+                  template_data: { "entreprise": "Université de Lille" }
+                  to:
+                    - { "email": "alice@example.com", "name": "Alice" }
+                    - { "email": "bob@example.com", "name": "Bob" }
+              individuel:
+                summary: Envoi individuel personnalisé
+                value:
+                  template_id: "uuid-template"
+                  individuel: true
+                  template_data:
+                    { "entreprise": "Université de Lille", "annee": "2026" }
+                  to:
+                    - {
+                        "email": "alice@example.com",
+                        "name": "Alice",
+                        "template_data": { "nom": "Alice", "code": "A123" },
+                      }
+                    - {
+                        "email": "bob@example.com",
+                        "name": "Bob",
+                        "template_data": { "nom": "Bob", "code": "B456" },
+                      }
+                  cc:
+                    - { "email": "manager@example.com" }
+      responses:
+        "202":
+          description: |
+            Mail(s) accepté(s) et mis en queue.
+            - Mode groupé : retourne un `Mail`
+            - Mode individuel : retourne un `CreateMailBatchResponse`
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/MailApiResponse"
+                  - allOf:
+                      - $ref: "#/components/schemas/ApiResponseBase"
+                      - type: object
+                        properties:
+                          data:
+                            $ref: "#/components/schemas/CreateMailBatchResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    get:
+      tags: [Mails]
+      summary: Lister les mails (pagination, filtre par statut)
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/MailStatus"
+      responses:
+        "200":
+          description: Liste paginée de mails
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MailPaginatedResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /mails/stats:
+    get:
+      tags: [Mails]
+      summary: Statistiques des mails du tenant
+      responses:
+        "200":
+          description: Statistiques par statut
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponseBase"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/MailStats"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /mails/{id}:
+    get:
+      tags: [Mails]
+      summary: Détail d'un mail avec destinataires
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Détail du mail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MailApiResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /mails/{id}/cancel:
+    post:
+      tags: [Mails]
+      summary: Annuler un mail en attente
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Mail annulé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /mails/{id}/retry:
+    post:
+      tags: [Mails]
+      summary: Relancer un mail en échec
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Mail relancé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  # ── Templates ─────────────────────────────────────
+  /templates:
+    post:
+      tags: [Templates]
+      summary: Créer un template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTemplateRequest"
+      responses:
+        "201":
+          description: Template créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateApiResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    get:
+      tags: [Templates]
+      summary: Lister les templates
+      responses:
+        "200":
+          description: Liste des templates
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponseBase"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Template"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /templates/{id}:
+    get:
+      tags: [Templates]
+      summary: Détail d'un template
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Détail du template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateApiResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Templates]
+      summary: Modifier un template
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTemplateRequest"
+      responses:
+        "200":
+          description: Template modifié
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateApiResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [Templates]
+      summary: Supprimer un template
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "204":
+          description: Template supprimé
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /templates/{id}/preview:
+    post:
+      tags: [Templates]
+      summary: Prévisualiser un template avec des données
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: Variables de substitution
+      responses:
+        "200":
+          description: Rendu du template
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponseBase"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/TemplatePreview"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ── SMTP Configs ──────────────────────────────────
+  /smtp-configs:
+    post:
+      tags: [SMTP Configs]
+      summary: Créer une configuration SMTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSMTPConfigRequest"
+      responses:
+        "201":
+          description: Config SMTP créée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SMTPConfigApiResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    get:
+      tags: [SMTP Configs]
+      summary: Lister les configurations SMTP
+      responses:
+        "200":
+          description: Liste des configs SMTP
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponseBase"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/SMTPConfig"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /smtp-configs/{id}:
+    get:
+      tags: [SMTP Configs]
+      summary: Détail d'une configuration SMTP
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Détail de la config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SMTPConfigApiResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [SMTP Configs]
+      summary: Modifier une configuration SMTP
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSMTPConfigRequest"
+      responses:
+        "200":
+          description: Config modifiée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SMTPConfigApiResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [SMTP Configs]
+      summary: Supprimer une configuration SMTP
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "204":
+          description: Config supprimée
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /smtp-configs/{id}/test:
+    post:
+      tags: [SMTP Configs]
+      summary: Tester la connexion SMTP
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Connexion SMTP réussie
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── Branding ──────────────────────────────────────
+  /branding:
+    get:
+      tags: [Branding]
+      summary: Récupérer le branding de l'application
+      security: []
+      responses:
+        "200":
+          description: Branding courant
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponseBase"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AppBranding"
+
+  /branding/logo:
+    get:
+      tags: [Branding]
+      summary: Récupérer l'image du logo
+      security: []
+      responses:
+        "200":
+          description: Image du logo
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/svg+xml:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/branding:
+    put:
+      tags: [Branding, Admin]
+      summary: Modifier le branding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBrandingRequest"
+      responses:
+        "200":
+          description: Branding modifié
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponseBase"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AppBranding"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/branding/logo:
+    post:
+      tags: [Branding, Admin]
+      summary: Uploader le logo de l'application
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [logo]
+              properties:
+                logo:
+                  type: string
+                  format: binary
+                  description: Image du logo (PNG, JPEG ou SVG, max 512 Ko)
+      responses:
+        "200":
+          description: Logo mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  # ── Admin ─────────────────────────────────────────
+  /admin/tenants:
+    post:
+      tags: [Admin]
+      summary: Créer un tenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTenantRequest"
+      responses:
+        "201":
+          description: Tenant créé (contient la clé API générée)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantApiResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    get:
+      tags: [Admin]
+      summary: Lister les tenants (pagination)
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Liste paginée de tenants
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantPaginatedResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/tenants/{id}:
+    get:
+      tags: [Admin]
+      summary: Détail d'un tenant
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Détail du tenant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantApiResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Admin]
+      summary: Modifier un tenant
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTenantRequest"
+      responses:
+        "200":
+          description: Tenant modifié
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantApiResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Admin]
+      summary: Supprimer un tenant
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "204":
+          description: Tenant supprimé
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/tenants/{id}/regenerate-key:
+    post:
+      tags: [Admin]
+      summary: Renouveler la clé API d'un tenant
+      description: |
+        Génère une nouvelle clé API pour le tenant spécifié.
+        L'ancienne clé est immédiatement révoquée et ne fonctionnera plus.
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Tenant avec la nouvelle clé API
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponseBase"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Tenant"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/stats/by-tenant:
+    get:
+      tags: [Admin]
+      summary: Statistiques mails agrégées par tenant
+      responses:
+        "200":
+          description: Stats par tenant
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponseBase"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/TenantMailStats"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/queues:
+    get:
+      tags: [Admin]
+      summary: Monitoring des queues Asynq
+      responses:
+        "200":
+          description: État des queues
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponseBase"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/QueueInfo"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+# ── Composants ────────────────────────────────────────
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token JWT obtenu via POST /auth/token
+
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+    BadRequest:
+      description: Requête invalide
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Non authentifié
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Accès refusé (rôle admin requis)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Conflit (doublon ou état incompatible)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    RateLimited:
+      description: Limite de débit dépassée
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalError:
+      description: Erreur interne du serveur
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    # ── Enveloppes ──
+    ApiResponseBase:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+
+    MessageResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponseBase"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                message:
+                  type: string
+
+    TokenResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponseBase"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                token:
+                  type: string
+
+    # ── Health ──
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, dégradé]
+        database:
+          type: string
+          enum: [ok, erreur]
+        redis:
+          type: string
+          enum: [ok, erreur]
+
+    # ── Branding ──
+    AppBranding:
+      type: object
+      properties:
+        app_title:
+          type: string
+          example: MailHive
+        app_subtitle:
+          type: string
+          example: Gestion des mails
+        logo_url:
+          type: string
+          description: URL du logo (vide si aucun logo)
+        updated_at:
+          type: string
+          format: date-time
+
+    UpdateBrandingRequest:
+      type: object
+      properties:
+        app_title:
+          type: string
+        app_subtitle:
+          type: string
+
+    # ── Tenant ──
+    TenantSettings:
+      type: object
+      properties:
+        rate_limit:
+          type: number
+          format: double
+          description: Mails par seconde
+          example: 100
+        rate_burst:
+          type: integer
+          description: Capacité de burst
+          example: 200
+        max_destinataires:
+          type: integer
+          description: Nombre max de destinataires par requête (TO + CC + BCC). Vérifié à chaque envoi.
+          example: 500
+        store_body:
+          type: boolean
+          default: false
+          description: |
+            Si true, conserve une copie compressée (zstd) du corps HTML/texte après envoi.
+            Par défaut false : les corps sont purgés après envoi pour économiser l'espace disque.
+
+    Tenant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        api_key:
+          type: string
+          description: Clé API (visible uniquement à la création)
+        is_active:
+          type: boolean
+        settings:
+          $ref: "#/components/schemas/TenantSettings"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateTenantRequest:
+      type: object
+      required: [name, slug]
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+        settings:
+          $ref: "#/components/schemas/TenantSettings"
+
+    UpdateTenantRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+        is_active:
+          type: boolean
+        settings:
+          $ref: "#/components/schemas/TenantSettings"
+
+    TenantApiResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponseBase"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/Tenant"
+
+    TenantPaginatedResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponseBase"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Tenant"
+                total:
+                  type: integer
+                  format: int64
+                page:
+                  type: integer
+                limit:
+                  type: integer
+                total_pages:
+                  type: integer
+
+    # ── Mail ──
+    EmailAddress:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        template_data:
+          type: object
+          additionalProperties:
+            type: string
+          description: |
+            Données de template spécifiques à ce destinataire (mode individuel uniquement).
+            Fusionnées avec template_data partagé ; les clés spécifiques écrasent les clés partagées.
+
+    Attachment:
+      type: object
+      required: [filename, content, content_type]
+      properties:
+        filename:
+          type: string
+        content:
+          type: string
+          format: byte
+          description: Contenu encodé en base64
+        content_type:
+          type: string
+
+    MailStatus:
+      type: string
+      enum: [pending, queued, sending, sent, failed, cancelled]
+
+    MailRecipient:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        mail_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [to, cc, bcc]
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+
+    Mail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        smtp_config_id:
+          type: string
+          format: uuid
+          nullable: true
+        template_id:
+          type: string
+          format: uuid
+          nullable: true
+        from_email:
+          type: string
+        from_name:
+          type: string
+        subject:
+          type: string
+        text_body:
+          type: string
+          description: |
+            Corps texte du mail. Purgé après envoi sauf si store_body est activé sur le tenant
+            (dans ce cas restauré depuis la version compressée).
+        html_body:
+          type: string
+          description: |
+            Corps HTML du mail. Purgé après envoi sauf si store_body est activé sur le tenant
+            (dans ce cas restauré depuis la version compressée).
+        body_stored:
+          type: boolean
+          readOnly: true
+          description: Indique si le corps a été conservé (compressé) après envoi.
+        template_data:
+          type: object
+          additionalProperties:
+            type: string
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Attachment"
+        status:
+          $ref: "#/components/schemas/MailStatus"
+        status_message:
+          type: string
+        attempts:
+          type: integer
+        scheduled_at:
+          type: string
+          format: date-time
+          nullable: true
+        sent_at:
+          type: string
+          format: date-time
+          nullable: true
+        task_id:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        recipients:
+          type: array
+          items:
+            $ref: "#/components/schemas/MailRecipient"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateMailRequest:
+      type: object
+      required: [to]
+      properties:
+        smtp_config_id:
+          type: string
+          format: uuid
+        template_id:
+          type: string
+          format: uuid
+        from:
+          $ref: "#/components/schemas/EmailAddress"
+        to:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/EmailAddress"
+        cc:
+          type: array
+          items:
+            $ref: "#/components/schemas/EmailAddress"
+        bcc:
+          type: array
+          items:
+            $ref: "#/components/schemas/EmailAddress"
+        subject:
+          type: string
+        text_body:
+          type: string
+        html_body:
+          type: string
+        template_data:
+          type: object
+          additionalProperties:
+            type: string
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Attachment"
+        metadata:
+          type: object
+          additionalProperties: true
+        scheduled_at:
+          type: string
+          format: date-time
+          description: |
+            Date d'envoi planifié. Formats acceptés :
+            - RFC3339 : 2026-03-07T20:00:00Z
+            - RFC3339 avec offset : 2026-03-07T20:00:00+02:00
+            - Datetime avec T : 2026-03-07T20:00:00
+            - Datetime avec espace : 2026-03-07 20:00:00
+            - Date seule : 2026-03-07
+            Si la date est dans le futur, le mail sera planifié et envoyé à cette date.
+            Si absente ou dans le passé, l'envoi est immédiat.
+          example: "2026-03-07 20:00:00"
+        individuel:
+          type: boolean
+          default: false
+          description: |
+            Si true, crée N mails distincts (1 par destinataire TO), chacun avec son propre
+            template_data (fusion shared + per-recipient). Les CC/BCC sont répliqués sur chaque mail.
+            La réponse sera un objet CreateMailBatchResponse au lieu d'un Mail unique.
+
+    CreateMailBatchResponse:
+      type: object
+      description: Réponse lors d'un envoi individuel (N mails créés)
+      properties:
+        total:
+          type: integer
+          description: Nombre de mails créés
+        mails:
+          type: array
+          items:
+            $ref: "#/components/schemas/Mail"
+
+    MailStats:
+      type: object
+      properties:
+        pending:
+          type: integer
+          format: int64
+        queued:
+          type: integer
+          format: int64
+        sending:
+          type: integer
+          format: int64
+        sent:
+          type: integer
+          format: int64
+        failed:
+          type: integer
+          format: int64
+        cancelled:
+          type: integer
+          format: int64
+        total:
+          type: integer
+          format: int64
+
+    TenantMailStats:
+      type: object
+      properties:
+        tenant_id:
+          type: string
+        tenant_name:
+          type: string
+        sent:
+          type: integer
+          format: int64
+        pending:
+          type: integer
+          format: int64
+        failed:
+          type: integer
+          format: int64
+        total:
+          type: integer
+          format: int64
+
+    MailApiResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponseBase"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/Mail"
+
+    MailPaginatedResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponseBase"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Mail"
+                total:
+                  type: integer
+                  format: int64
+                page:
+                  type: integer
+                limit:
+                  type: integer
+                total_pages:
+                  type: integer
+
+    # ── Template ──
+    Template:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        subject_tmpl:
+          type: string
+        text_body:
+          type: string
+        html_body:
+          type: string
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateTemplateRequest:
+      type: object
+      required: [name, slug]
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+        subject_tmpl:
+          type: string
+        text_body:
+          type: string
+        html_body:
+          type: string
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+
+    UpdateTemplateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+        subject_tmpl:
+          type: string
+        text_body:
+          type: string
+        html_body:
+          type: string
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+        is_active:
+          type: boolean
+
+    TemplatePreview:
+      type: object
+      properties:
+        subject:
+          type: string
+        text_body:
+          type: string
+        html_body:
+          type: string
+
+    TemplateApiResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponseBase"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/Template"
+
+    # ── SMTP Config ──
+    AuthMethod:
+      type: string
+      enum: [PLAIN, LOGIN, CRAM-MD5, NONE]
+
+    TLSPolicy:
+      type: string
+      enum: [mandatory, opportunistic, none]
+
+    SMTPConfig:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        host:
+          type: string
+        port:
+          type: integer
+        username:
+          type: string
+          nullable: true
+        auth_method:
+          $ref: "#/components/schemas/AuthMethod"
+        tls_policy:
+          $ref: "#/components/schemas/TLSPolicy"
+        from_email:
+          type: string
+        from_name:
+          type: string
+        is_default:
+          type: boolean
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateSMTPConfigRequest:
+      type: object
+      required: [name, host, from_email]
+      properties:
+        name:
+          type: string
+        host:
+          type: string
+        port:
+          type: integer
+        username:
+          type: string
+        password:
+          type: string
+        auth_method:
+          $ref: "#/components/schemas/AuthMethod"
+        tls_policy:
+          $ref: "#/components/schemas/TLSPolicy"
+        from_email:
+          type: string
+        from_name:
+          type: string
+        is_default:
+          type: boolean
+
+    UpdateSMTPConfigRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        host:
+          type: string
+        port:
+          type: integer
+        username:
+          type: string
+        password:
+          type: string
+        auth_method:
+          $ref: "#/components/schemas/AuthMethod"
+        tls_policy:
+          $ref: "#/components/schemas/TLSPolicy"
+        from_email:
+          type: string
+        from_name:
+          type: string
+        is_default:
+          type: boolean
+        is_active:
+          type: boolean
+
+    SMTPConfigApiResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiResponseBase"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/SMTPConfig"
+
+    # ── Queue ──
+    QueueInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        active:
+          type: integer
+        pending:
+          type: integer
+        scheduled:
+          type: integer
+        retry:
+          type: integer
+        archived:
+          type: integer
+        completed:
+          type: integer
+        processed:
+          type: integer
+        failed:
+          type: integer
+        latency_ms:
+          type: integer
+          format: int64
+        paused:
+          type: boolean

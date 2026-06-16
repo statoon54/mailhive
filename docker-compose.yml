@@ -1,0 +1,135 @@
+# =============================================================================
+# MailHive — Docker Compose (distribution)
+# 3 services : mailhive (binaire unique) + postgres + redis
+# Mailpit disponible en dev via : docker compose --profile dev up -d
+# =============================================================================
+
+services:
+  mailhive:
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION:-dev}
+    ports:
+      - "8080:8080"
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: 8080
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: mailhive
+      DB_PASSWORD: mailhive_secret
+      DB_NAME: mailhive
+      DB_SSL_MODE: disable
+      DB_MAX_CONNS: 50
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: 0
+      JWT_SECRET: dev-secret-changez-moi-en-production-avec-une-cle-de-64-chars
+      JWT_EXPIRATION: 24h
+      ADMIN_API_KEY: admin-dev-key
+      ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      DEFAULT_RATE_LIMIT: 100
+      DEFAULT_RATE_BURST: 200
+      SMTP_MODE: ${SMTP_MODE:-real}
+      MAILPIT_HOST: mailpit
+      MAILPIT_PORT: 1025
+      WORKER_CONCURRENCY: 50
+      WORKER_QUEUE_CRITICAL: 6
+      WORKER_QUEUE_DEFAULT: 3
+      WORKER_QUEUE_LOW: 1
+      # Stockage des pièces jointes : "postgres" (défaut) ou "s3".
+      # Pour tester S3 en local, lancer SeaweedFS (profil dev) avec :
+      #   BLOB_BACKEND=s3 docker compose --profile dev up -d
+      BLOB_BACKEND: ${BLOB_BACKEND:-postgres}
+      BLOB_S3_ENDPOINT: ${BLOB_S3_ENDPOINT:-seaweedfs:8333}
+      BLOB_S3_BUCKET: ${BLOB_S3_BUCKET:-mailhive-attachments}
+      BLOB_S3_ACCESS_KEY: ${BLOB_S3_ACCESS_KEY:-mailhive}
+      BLOB_S3_SECRET_KEY: ${BLOB_S3_SECRET_KEY:-mailhive_secret}
+      BLOB_S3_REGION: ${BLOB_S3_REGION:-us-east-1}
+      BLOB_S3_USE_SSL: ${BLOB_S3_USE_SSL:-false}
+      LLM_PROVIDER: openai
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.mistral.ai}
+      LLM_MODEL: ${LLM_MODEL:-mistral-small-latest}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: mailhive
+      POSTGRES_PASSWORD: mailhive_secret
+      POSTGRES_DB: mailhive
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mailhive"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: valkey/valkey:8-alpine
+    command: valkey-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mailpit:
+    image: axllent/mailpit:latest
+    profiles: ["dev"]
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8025/api/v1/info"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Object store S3 local pour tester BLOB_BACKEND=s3 (profil dev).
+  # 8333 = passerelle S3, 8888 = filer HTTP, 9333 = master.
+  # L'identité S3 (docker/seaweedfs/s3.json) est requise : sans elle, la
+  # passerelle rejette les requêtes signées.
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    profiles: ["dev"]
+    command: server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json -dir=/data
+    ports:
+      - "8333:8333"
+      - "8888:8888"
+      - "9333:9333"
+    volumes:
+      - ./docker/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+      - seaweedfs_data:/data
+    healthcheck:
+      # La racine "/" du port S3 ne renvoie pas 2xx ; /status oui. localhost peut
+      # résoudre en IPv6 (non écouté) → on cible 127.0.0.1 explicitement.
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8333/status"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+      # La passerelle S3 met ~15-20 s à écouter : les échecs pendant cette fenêtre
+      # ne comptent pas comme "unhealthy" (un succès la marque saine immédiatement).
+      start_period: 30s
+
+volumes:
+  postgres_data:
+  redis_data:
+  seaweedfs_data:

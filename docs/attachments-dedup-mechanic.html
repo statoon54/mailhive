@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MailHive — Mécanique de déduplication des pièces jointes</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'JetBrains Mono', monospace; background: #020617; min-height: 100vh; padding: 2rem; color: white; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .header { margin-bottom: 2rem; }
+    .header-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+    .pulse-dot { width: 12px; height: 12px; background: #34d399; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.025em; }
+    .subtitle { color: #94a3b8; font-size: 0.85rem; margin-left: 1.75rem; }
+    .diagram-container { background: rgba(15, 23, 42, 0.5); border-radius: 1rem; border: 1px solid #1e293b; padding: 1.5rem; overflow-x: auto; }
+    svg { width: 100%; min-width: 980px; display: block; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 2rem; }
+    .card { background: rgba(15, 23, 42, 0.5); border-radius: 0.75rem; border: 1px solid #1e293b; padding: 1.25rem; }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .card-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .card-dot.emerald { background: #34d399; }
+    .card-dot.violet { background: #a78bfa; }
+    .card-dot.orange { background: #fb923c; }
+    .card h3 { font-size: 0.85rem; font-weight: 600; }
+    .card ul { list-style: none; color: #94a3b8; font-size: 0.72rem; line-height: 1.5; }
+    .card li { margin-bottom: 0.3rem; }
+    .card code { color: #cbd5e1; }
+    .footer { text-align: center; margin-top: 1.5rem; color: #475569; font-size: 0.72rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-row">
+        <div class="pulse-dot"></div>
+        <h1>MailHive — Déduplication des pièces jointes</h1>
+      </div>
+      <p class="subtitle">Stockage content-addressed : N mails partageant une PJ → 1 seul blob. Backend PostgreSQL ou S3/SeaweedFS via le port BlobStore.</p>
+    </div>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1040 990">
+        <defs>
+          <marker id="ah" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#64748b" /></marker>
+          <marker id="ah-v" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa" /></marker>
+          <marker id="ah-o" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#fb923c" /></marker>
+          <marker id="ah-r" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#fb7185" /></marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/></pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#grid)" />
+
+        <!-- =========================== PHASE BANDS =========================== -->
+        <rect x="12" y="56" width="1016" height="226" rx="12" fill="rgba(52,211,153,0.04)" stroke="#34d399" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="26" y="76" fill="#34d399" font-size="11" font-weight="700">1 — ÉCRITURE  ·  création d'une campagne de N mails  (POST /api/v1/mails)</text>
+
+        <rect x="12" y="298" width="1016" height="316" rx="12" fill="rgba(167,139,250,0.04)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="26" y="318" fill="#a78bfa" font-size="11" font-weight="700">2 — STOCKAGE  ·  ce qui est réellement persisté</text>
+
+        <rect x="12" y="630" width="1016" height="344" rx="12" fill="rgba(251,146,60,0.04)" stroke="#fb923c" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="26" y="650" fill="#fb923c" font-size="11" font-weight="700">3 — ENVOI (worker, par mail)  +  GARBAGE COLLECTION (orphelins)</text>
+
+        <!-- =========================== ARROWS (drawn first, behind boxes) =========================== -->
+        <!-- write chain -->
+        <line x1="132" y1="116" x2="171" y2="116" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ah)"/>
+        <line x1="297" y1="116" x2="336" y2="116" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#ah)"/>
+        <line x1="507" y1="116" x2="556" y2="116" stroke="#34d399" stroke-width="1.5" marker-end="url(#ah)"/>
+        <!-- MailService -> Transaction (down) -->
+        <line x1="420" y1="142" x2="445" y2="200" stroke="#34d399" stroke-width="1.5" marker-end="url(#ah)"/>
+        <!-- Store -> attachments (UpsertMeta) -->
+        <path d="M 640 182 L 560 250 Q 540 268 520 290 L 500 384" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#ah-v)"/>
+        <text x="520" y="262" fill="#a78bfa" font-size="8">② UpsertMeta</text>
+        <!-- Store -> blob Put -->
+        <path d="M 770 150 Q 830 150 830 230 L 830 372" fill="none" stroke="#fb923c" stroke-width="1.5" marker-end="url(#ah-o)"/>
+        <text x="838" y="250" fill="#fb923c" font-size="8">③ BlobStore.Put</text>
+        <text x="838" y="262" fill="#fb923c" font-size="8">(si contenu nouveau)</text>
+
+        <!-- Transaction -> tables -->
+        <path d="M 400 280 Q 360 300 320 320 L 250 470" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#ah-v)"/>
+        <line x1="445" y1="280" x2="455" y2="500" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#ah-v)"/>
+        <path d="M 470 280 Q 520 320 510 384" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#ah-v)"/>
+        <text x="520" y="345" fill="#a78bfa" font-size="8">+ N liens</text>
+
+        <!-- send chain -->
+        <line x1="172" y1="742" x2="189" y2="742" stroke="#34d399" stroke-width="1.5" marker-end="url(#ah)"/>
+        <line x1="342" y1="742" x2="359" y2="742" stroke="#34d399" stroke-width="1.5" marker-end="url(#ah)"/>
+        <line x1="522" y1="742" x2="539" y2="742" stroke="#34d399" stroke-width="1.5" marker-end="url(#ah)"/>
+        <line x1="702" y1="742" x2="719" y2="742" stroke="#34d399" stroke-width="1.5" marker-end="url(#ah)"/>
+        <line x1="832" y1="742" x2="849" y2="742" stroke="#34d399" stroke-width="1.5" marker-end="url(#ah)"/>
+        <!-- send reads (dashed up to storage) -->
+        <line x1="265" y1="703" x2="430" y2="592" stroke="#a78bfa" stroke-width="1.3" stroke-dasharray="4,3" marker-end="url(#ah-v)"/>
+        <text x="300" y="650" fill="#a78bfa" font-size="8">lit mail_attachments + attachments</text>
+        <line x1="455" y1="700" x2="710" y2="546" stroke="#fb923c" stroke-width="1.3" stroke-dasharray="4,3" marker-end="url(#ah-o)"/>
+        <text x="520" y="690" fill="#fb923c" font-size="8">BlobStore.Get</text>
+
+        <!-- GC chain -->
+        <line x1="182" y1="892" x2="199" y2="892" stroke="#fb7185" stroke-width="1.5" marker-end="url(#ah-r)"/>
+        <path d="M 360 892 Q 470 892 480 600 L 488 478" fill="none" stroke="#fb7185" stroke-width="1.3" stroke-dasharray="4,3" marker-end="url(#ah-r)"/>
+        <text x="430" y="720" fill="#fb7185" font-size="8">ListOrphans (NOT EXISTS lien)</text>
+        <path d="M 460 905 Q 720 920 760 590" fill="none" stroke="#fb7185" stroke-width="1.3" stroke-dasharray="4,3" marker-end="url(#ah-r)"/>
+        <text x="600" y="912" fill="#fb7185" font-size="8">BlobStore.Delete → DeleteMeta</text>
+
+        <!-- =========================== PHASE 1 : WRITE =========================== -->
+        <rect x="22" y="89" width="110" height="54" rx="6" fill="#0f172a"/>
+        <rect x="22" y="89" width="110" height="54" rx="6" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="77" y="112" fill="white" font-size="11" font-weight="600" text-anchor="middle">Client API</text>
+        <text x="77" y="128" fill="#94a3b8" font-size="8" text-anchor="middle">POST /mails</text>
+
+        <rect x="173" y="89" width="124" height="54" rx="6" fill="#0f172a"/>
+        <rect x="173" y="89" width="124" height="54" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="235" y="112" fill="white" font-size="11" font-weight="600" text-anchor="middle">MailHandler</text>
+        <text x="235" y="128" fill="#94a3b8" font-size="8" text-anchor="middle">handler HTTP</text>
+
+        <rect x="338" y="89" width="169" height="54" rx="6" fill="#0f172a"/>
+        <rect x="338" y="89" width="169" height="54" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="422" y="110" fill="white" font-size="11" font-weight="600" text-anchor="middle">MailService</text>
+        <text x="422" y="126" fill="#94a3b8" font-size="8" text-anchor="middle">creerMail / createIndividuel</text>
+        <text x="422" y="137" fill="#34d399" font-size="7" text-anchor="middle">boucle N destinataires</text>
+
+        <rect x="558" y="76" width="214" height="106" rx="6" fill="#0f172a"/>
+        <rect x="558" y="76" width="214" height="106" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="665" y="96" fill="white" font-size="11" font-weight="600" text-anchor="middle">AttachmentService.Store</text>
+        <text x="665" y="111" fill="#34d399" font-size="8" text-anchor="middle">appelé 1× par PJ (pas par mail)</text>
+        <text x="572" y="130" fill="#94a3b8" font-size="8">① sha256 := SHA-256(contenu)</text>
+        <text x="572" y="146" fill="#94a3b8" font-size="8">② UpsertMeta(tenant_id, sha256)</text>
+        <text x="572" y="162" fill="#94a3b8" font-size="8">③ si créé → BlobStore.Put(octets)</text>
+        <text x="572" y="176" fill="#fbbf24" font-size="7">dédup : 2ᵉ contenu identique = no-op</text>
+
+        <rect x="338" y="200" width="210" height="80" rx="6" fill="#0f172a"/>
+        <rect x="338" y="200" width="210" height="80" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="443" y="221" fill="white" font-size="10" font-weight="600" text-anchor="middle">CreateBatchWithRecipients</text>
+        <text x="443" y="237" fill="#34d399" font-size="8" text-anchor="middle">1 transaction pgx (atomique)</text>
+        <text x="352" y="256" fill="#94a3b8" font-size="8">insère mails(N) + recipients(N)</text>
+        <text x="352" y="270" fill="#94a3b8" font-size="8">+ mail_attachments(N)</text>
+
+        <!-- =========================== PHASE 2 : STORAGE =========================== -->
+        <!-- PostgreSQL boundary (metadata) -->
+        <rect x="110" y="358" width="470" height="244" rx="10" fill="rgba(167,139,250,0.05)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="6,4"/>
+        <text x="122" y="376" fill="#a78bfa" font-size="9" font-weight="600">PostgreSQL — métadonnées</text>
+
+        <!-- mails + recipients -->
+        <rect x="130" y="470" width="180" height="110" rx="6" fill="#0f172a"/>
+        <rect x="130" y="470" width="180" height="110" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="220" y="491" fill="white" font-size="11" font-weight="600" text-anchor="middle">mails  (N lignes)</text>
+        <text x="220" y="508" fill="#94a3b8" font-size="8" text-anchor="middle">1 par destinataire</text>
+        <text x="220" y="528" fill="white" font-size="10" font-weight="600" text-anchor="middle">mail_recipients (N)</text>
+        <text x="220" y="546" fill="#94a3b8" font-size="8" text-anchor="middle">to / cc / bcc</text>
+        <text x="220" y="566" fill="#a78bfa" font-size="7" text-anchor="middle">contenu propre à chaque mail</text>
+
+        <!-- attachments -->
+        <rect x="360" y="384" width="200" height="94" rx="6" fill="#0f172a"/>
+        <rect x="360" y="384" width="200" height="94" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="460" y="405" fill="white" font-size="11" font-weight="600" text-anchor="middle">attachments</text>
+        <text x="460" y="421" fill="#34d399" font-size="8" text-anchor="middle">1 ligne par contenu distinct</text>
+        <text x="374" y="440" fill="#94a3b8" font-size="8">UNIQUE (tenant_id, sha256)</text>
+        <text x="374" y="455" fill="#94a3b8" font-size="8">size, content_type, storage</text>
+        <text x="374" y="470" fill="#fbbf24" font-size="8">orphelin = aucun lien</text>
+
+        <!-- mail_attachments -->
+        <rect x="360" y="500" width="200" height="86" rx="6" fill="#0f172a"/>
+        <rect x="360" y="500" width="200" height="86" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="460" y="521" fill="white" font-size="11" font-weight="600" text-anchor="middle">mail_attachments</text>
+        <text x="460" y="537" fill="#34d399" font-size="8" text-anchor="middle">N lignes — table de liaison</text>
+        <text x="374" y="556" fill="#94a3b8" font-size="8">(mail_id → attachment_id)</text>
+        <text x="374" y="571" fill="#94a3b8" font-size="8">filename + position (par mail)</text>
+
+        <!-- N..1 marker between mail_attachments and attachments -->
+        <line x1="460" y1="500" x2="460" y2="478" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#ah-v)"/>
+        <text x="468" y="494" fill="#a78bfa" font-size="8">N → 1</text>
+
+        <!-- port BlobStore boundary -->
+        <rect x="612" y="360" width="226" height="242" rx="10" fill="rgba(251,146,60,0.05)" stroke="#fb923c" stroke-width="1" stroke-dasharray="6,4"/>
+        <text x="624" y="378" fill="#fb923c" font-size="9" font-weight="600">port BlobStore</text>
+        <text x="624" y="392" fill="#94a3b8" font-size="8">BLOB_BACKEND = postgres | s3</text>
+        <text x="624" y="404" fill="#94a3b8" font-size="7">clé = (tenant_id, sha256)</text>
+
+        <!-- attachment_blobs (PG backend) -->
+        <rect x="632" y="416" width="186" height="80" rx="6" fill="#0f172a"/>
+        <rect x="632" y="416" width="186" height="80" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="725" y="437" fill="white" font-size="10" font-weight="600" text-anchor="middle">attachment_blobs</text>
+        <text x="725" y="452" fill="#34d399" font-size="8" text-anchor="middle">1 blob — backend postgres</text>
+        <text x="646" y="470" fill="#94a3b8" font-size="8">PK (tenant_id, sha256)</text>
+        <text x="646" y="485" fill="#94a3b8" font-size="8">data BYTEA — sans FK</text>
+
+        <!-- S3 backend -->
+        <rect x="632" y="508" width="186" height="80" rx="6" fill="#0f172a"/>
+        <rect x="632" y="508" width="186" height="80" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="725" y="529" fill="white" font-size="10" font-weight="600" text-anchor="middle">S3 / SeaweedFS</text>
+        <text x="725" y="544" fill="#34d399" font-size="8" text-anchor="middle">1 objet — backend s3</text>
+        <text x="646" y="562" fill="#94a3b8" font-size="8">clé objet : tenant_id/sha256</text>
+        <text x="646" y="577" fill="#94a3b8" font-size="8">MinIO · S3 · R2</text>
+
+        <!-- big dedup callout -->
+        <rect x="860" y="384" width="160" height="202" rx="8" fill="rgba(52,211,153,0.08)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="940" y="406" fill="#34d399" font-size="10" font-weight="700" text-anchor="middle">LE GAIN</text>
+        <text x="940" y="430" fill="white" font-size="9" text-anchor="middle">Campagne N=2000</text>
+        <text x="940" y="444" fill="white" font-size="9" text-anchor="middle">PJ = 1 Mo identique</text>
+        <line x1="876" y1="456" x2="1004" y2="456" stroke="#1e293b" stroke-width="1"/>
+        <text x="940" y="476" fill="#94a3b8" font-size="8" text-anchor="middle">mails : 2000</text>
+        <text x="940" y="491" fill="#94a3b8" font-size="8" text-anchor="middle">mail_attachments : 2000</text>
+        <text x="940" y="506" fill="#94a3b8" font-size="8" text-anchor="middle">attachments : 1</text>
+        <text x="940" y="521" fill="#fbbf24" font-size="9" font-weight="600" text-anchor="middle">blob : 1  (≈ 1 Mo)</text>
+        <line x1="876" y1="533" x2="1004" y2="533" stroke="#1e293b" stroke-width="1"/>
+        <text x="940" y="553" fill="#94a3b8" font-size="8" text-anchor="middle">inline : ~2,7 Go</text>
+        <text x="940" y="570" fill="#34d399" font-size="9" font-weight="700" text-anchor="middle">dédup : ~1 Mo</text>
+
+        <!-- =========================== PHASE 3 : SEND =========================== -->
+        <rect x="22" y="703" width="150" height="78" rx="6" fill="#0f172a"/>
+        <rect x="22" y="703" width="150" height="78" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="97" y="730" fill="white" font-size="11" font-weight="600" text-anchor="middle">Worker</text>
+        <text x="97" y="746" fill="#94a3b8" font-size="8" text-anchor="middle">HandleMailSend</text>
+        <text x="97" y="762" fill="#34d399" font-size="7" text-anchor="middle">1 tâche par mail</text>
+
+        <rect x="190" y="710" width="152" height="64" rx="6" fill="#0f172a"/>
+        <rect x="190" y="710" width="152" height="64" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="266" y="736" fill="white" font-size="10" font-weight="600" text-anchor="middle">GetAttachmentRefs</text>
+        <text x="266" y="752" fill="#94a3b8" font-size="8" text-anchor="middle">jointure liaison</text>
+
+        <rect x="360" y="703" width="160" height="78" rx="6" fill="#0f172a"/>
+        <rect x="360" y="703" width="160" height="78" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="440" y="730" fill="white" font-size="11" font-weight="600" text-anchor="middle">AttachmentService</text>
+        <text x="440" y="745" fill="white" font-size="10" font-weight="600" text-anchor="middle">.Load</text>
+        <text x="440" y="763" fill="#94a3b8" font-size="8" text-anchor="middle">GetMeta + BlobStore.Get</text>
+
+        <rect x="540" y="710" width="162" height="64" rx="6" fill="#0f172a"/>
+        <rect x="540" y="710" width="162" height="64" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="621" y="732" fill="white" font-size="10" font-weight="600" text-anchor="middle">reconstitue</text>
+        <text x="621" y="748" fill="#94a3b8" font-size="8" text-anchor="middle">mail.Attachments</text>
+        <text x="621" y="763" fill="#34d399" font-size="7" text-anchor="middle">en mémoire, avant SMTP</text>
+
+        <rect x="720" y="710" width="112" height="64" rx="6" fill="#0f172a"/>
+        <rect x="720" y="710" width="112" height="64" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="776" y="738" fill="white" font-size="11" font-weight="600" text-anchor="middle">Sender</text>
+        <text x="776" y="754" fill="#94a3b8" font-size="8" text-anchor="middle">go-mail</text>
+
+        <rect x="850" y="710" width="120" height="64" rx="6" fill="#0f172a"/>
+        <rect x="850" y="710" width="120" height="64" rx="6" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="910" y="738" fill="white" font-size="11" font-weight="600" text-anchor="middle">SMTP</text>
+        <text x="910" y="754" fill="#94a3b8" font-size="8" text-anchor="middle">relais sortant</text>
+
+        <!-- GC -->
+        <rect x="22" y="858" width="160" height="72" rx="6" fill="#0f172a"/>
+        <rect x="22" y="858" width="160" height="72" rx="6" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1.5"/>
+        <text x="102" y="884" fill="white" font-size="11" font-weight="600" text-anchor="middle">GCHandler</text>
+        <text x="102" y="900" fill="#94a3b8" font-size="8" text-anchor="middle">cron @hourly</text>
+        <text x="102" y="916" fill="#fb7185" font-size="7" text-anchor="middle">attachment:gc</text>
+
+        <rect x="200" y="858" width="270" height="72" rx="6" fill="#0f172a"/>
+        <rect x="200" y="858" width="270" height="72" rx="6" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1.5"/>
+        <text x="335" y="881" fill="white" font-size="10" font-weight="600" text-anchor="middle">CollectOrphans</text>
+        <text x="214" y="899" fill="#94a3b8" font-size="8">aucun lien  →  BlobStore.Delete</text>
+        <text x="214" y="913" fill="#94a3b8" font-size="8">puis DeleteMeta  (blob d'abord)</text>
+        <text x="214" y="926" fill="#fbbf24" font-size="7">délai de grâce 1h (campagne en cours)</text>
+
+        <!-- =========================== LEGEND =========================== -->
+        <text x="858" y="92" fill="white" font-size="10" font-weight="600">Légende</text>
+        <rect x="858" y="102" width="15" height="10" rx="2" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1"/>
+        <text x="879" y="110" fill="#94a3b8" font-size="8">Externe</text>
+        <rect x="858" y="118" width="15" height="10" rx="2" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="879" y="126" fill="#94a3b8" font-size="8">API</text>
+        <rect x="858" y="134" width="15" height="10" rx="2" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1"/>
+        <text x="879" y="142" fill="#94a3b8" font-size="8">Service / Worker</text>
+        <rect x="858" y="150" width="15" height="10" rx="2" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="879" y="158" fill="#94a3b8" font-size="8">Table PostgreSQL</text>
+        <rect x="858" y="166" width="15" height="10" rx="2" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="879" y="174" fill="#94a3b8" font-size="8">Object store (S3)</text>
+        <rect x="858" y="182" width="15" height="10" rx="2" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1"/>
+        <text x="879" y="190" fill="#94a3b8" font-size="8">GC / nettoyage</text>
+        <line x1="858" y1="206" x2="873" y2="206" stroke="#a78bfa" stroke-width="1.3" stroke-dasharray="4,3"/>
+        <text x="879" y="209" fill="#94a3b8" font-size="8">lecture (dashed)</text>
+      </svg>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-header"><div class="card-dot emerald"></div><h3>Écriture — déduplication</h3></div>
+        <ul>
+          <li>• <code>storeAttachments</code> appelé <b>1× par PJ</b> pour toute la campagne, pas par mail.</li>
+          <li>• <code>SHA-256(contenu)</code> → <code>UpsertMeta</code> sur <code>(tenant_id, sha256)</code>.</li>
+          <li>• Le blob n'est écrit (<code>Put</code>) que si le contenu est <b>nouveau</b> ; sinon no-op.</li>
+          <li>• Mail + destinataires + liens écrits dans <b>une seule transaction pgx</b> (atomique).</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-dot violet"></div><h3>Stockage — 3 tables + port</h3></div>
+        <ul>
+          <li>• <code>attachments</code> : 1 ligne / contenu (métadonnée, pas de compteur).</li>
+          <li>• <code>mail_attachments</code> : liaison N→1, porte le <code>filename</code> (propre au mail).</li>
+          <li>• <code>attachment_blobs</code> / <b>S3</b> : les octets, clé <code>(tenant_id, sha256)</code>, <b>sans FK</b> (symétrie des backends).</li>
+          <li>• Dédup <b>scopée tenant</b> : isolation, pas de fuite inter-tenant.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-dot orange"></div><h3>Envoi &amp; GC</h3></div>
+        <ul>
+          <li>• Worker : <code>GetAttachmentRefs</code> → <code>Load</code> → reconstitue <code>mail.Attachments</code> avant l'envoi (le Sender est inchangé).</li>
+          <li>• Pas de transaction distribuée DB↔S3 : blob d'abord à l'écriture, blob d'abord à la suppression.</li>
+          <li>• GC <code>@hourly</code> : <code>NOT EXISTS</code> de lien → supprime blob puis métadonnée, avec délai de grâce 1h. Pas de compteur dénormalisé (donc rien qui dérive à l'archivage).</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="footer">MailHive • Déduplication content-addressed des pièces jointes • migration 000005 • port BlobStore (postgres | s3)</p>
+  </div>
+</body>
+</html>

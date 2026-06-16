@@ -1,0 +1,22 @@
+bin/
+.env
+*.exe
+*.test
+*.out
+vendor/
+tmp/
+frontend/node_modules/
+frontend/dist/
+.DS_Store
+.idea/
+.vscode/
+# Prompts de dev locaux (le reste de .github/ — workflows, etc. — est versionné)
+.github/prompts/
+*.log
+*.cache
+*.bak
+*.swp
+*.swo
+send_2000_mails.sh
+send_2000_mails_individuel.sh
+

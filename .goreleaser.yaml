@@ -1,0 +1,58 @@
+# GoReleaser — publication des binaires multi-plateformes sur tag (vX.Y.Z).
+# Doc : https://goreleaser.com  —  valider : goreleaser check
+version: 2
+
+project_name: mailhive
+
+before:
+  hooks:
+    # Le binaire embarque le frontend (go:embed internal/frontend/dist) : on le
+    # construit avant la compilation Go pour que l'embed soit à jour.
+    - sh -c "cd frontend && npm ci"
+    - make build-frontend
+    - go mod tidy
+
+builds:
+  - id: mailhive
+    main: ./cmd/mailhive
+    binary: mailhive
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - id: mailhive
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github
+  sort: asc
+  groups:
+    - title: Fonctionnalités
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 0
+    - title: Corrections
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 1
+    - title: Autres
+      order: 999
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^Merge"
+
+release:
+  draft: false
+  prerelease: auto

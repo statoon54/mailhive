@@ -1,0 +1,26 @@
+# =============================================================================
+# Surcharge "pièces jointes sur S3" — à combiner avec docker-compose.yml.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.s3.yml --profile dev up
+#   (c.-à-d. `make docker-dev-s3`)
+#
+# Pourquoi un fichier séparé plutôt qu'un depends_on dans le compose de base :
+# `depends_on` démarre AUTOMATIQUEMENT sa cible même si son profil est inactif.
+# Mettre `mailhive -> seaweedfs` dans le compose de base ferait donc tourner
+# SeaweedFS à chaque `docker compose up` (mode postgres par défaut). Ici, la
+# dépendance n'existe que lorsqu'on active explicitement ce mode S3.
+# =============================================================================
+
+services:
+  mailhive:
+    environment:
+      BLOB_BACKEND: s3
+    # Attend que la passerelle S3 soit saine avant de démarrer : supprime les
+    # "passerelle S3 injoignable, nouvelle tentative" au lancement.
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
