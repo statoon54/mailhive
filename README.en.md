@@ -400,7 +400,7 @@ Set `SMTP_MODE=simulation` to test the API without a real SMTP server: mails are
 
 ### Mailpit — test SMTP server
 
-[Mailpit](https://github.com/axllent/mailpit) is bundled in the Docker stack (`dev` profile) as a test SMTP server: it captures all sent mail and offers a web UI (`:8025`) without ever delivering it. SMTP on `:1025` (no auth). On first start in `real` mode, MailHive auto-creates an admin tenant and a default Mailpit SMTP config if none exists.
+[Mailpit](https://github.com/axllent/mailpit) is bundled in the Docker stack (`dev` profile) as a test SMTP server: it captures all sent mail and offers a web UI (`:8025`) without ever delivering it. SMTP on `:1025` (no auth). On start, MailHive creates the admin tenant (`ADMIN_API_KEY`) if missing, except in `simulation` mode. In `mailpit` mode (dev profile) it additionally seeds a **default** Mailpit SMTP config pointing at the Mailpit container; in `real` mode (prod) no SMTP config is seeded — the administrator configures their own.
 
 ### SMTP integration tests
 
