@@ -335,9 +335,12 @@ make build             # build frontend then Go binary (with embed)
 
 ```bash
 # Provide secrets via a .env file (or the environment)
-MAILHIVE_TAG=v0.1.0 docker compose -f docker-compose.prod.yml up -d
+MAILHIVE_TAG=0.1.0 docker compose -f docker-compose.prod.yml up -d
 # or: make docker-prod
 ```
+
+> The image tag follows semver **without the `v` prefix** (`0.1.0`, `0.1`, `latest`),
+> unlike the git tag (`v0.1.0`).
 
 `JWT_SECRET`, `ENCRYPTION_KEY` (64 hex), `ADMIN_API_KEY` and `DB_PASSWORD` are **required** (startup fails otherwise). Migrations run automatically. Only port `8080` is exposed. For an external S3 (AWS S3, R2, managed MinIO), set `BLOB_S3_ENDPOINT` + credentials and remove the `seaweedfs` service and its dependency.
 
@@ -357,7 +360,7 @@ docker run -d -p 8080:8080 \
   -e REDIS_ADDR=redis.internal:6379 \
   -e JWT_SECRET=… -e ENCRYPTION_KEY=… -e ADMIN_API_KEY=… \
   -e BLOB_BACKEND=postgres \
-  ghcr.io/statoon54/mailhive:v0.1.0
+  ghcr.io/statoon54/mailhive:0.1.0
 ```
 
 Only **PostgreSQL and a Redis-compatible server** are mandatory; an S3 object store is only needed with `BLOB_BACKEND=s3`. Migrations run at startup.
