@@ -547,9 +547,12 @@ auto-hébergé par défaut). C'est un fichier autonome (ne pas combiner avec
 
 ```bash
 # Fournir les secrets via un .env (ou l'environnement) — voir .env.example
-MAILHIVE_TAG=v0.1.0 docker compose -f docker-compose.prod.yml up -d
+MAILHIVE_TAG=0.1.0 docker compose -f docker-compose.prod.yml up -d
 # ou : make docker-prod
 ```
+
+> Le tag de l'image suit le semver **sans préfixe `v`** (`0.1.0`, `0.1`, `latest`),
+> contrairement au tag git (`v0.1.0`).
 
 Les secrets `JWT_SECRET`, `ENCRYPTION_KEY` (64 hex), `ADMIN_API_KEY` et
 `DB_PASSWORD` sont **obligatoires** (le démarrage échoue sinon). Les migrations
@@ -586,7 +589,7 @@ docker run -d -p 8080:8080 \
   -e REDIS_ADDR=redis.interne:6379 \
   -e JWT_SECRET=… -e ENCRYPTION_KEY=… -e ADMIN_API_KEY=… \
   -e BLOB_BACKEND=postgres \
-  ghcr.io/statoon54/mailhive:v0.1.0
+  ghcr.io/statoon54/mailhive:0.1.0
 ```
 
 Seuls **PostgreSQL et un serveur compatible Redis** sont indispensables ; un
