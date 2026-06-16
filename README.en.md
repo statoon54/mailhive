@@ -13,8 +13,6 @@ Built as part of the MailHive project.
 
 ![MailHive dashboard](img/mailhive-dashboard.png)
 
-> Badges and URLs assume the `github.com/statoon54/mailhive` repository — adjust if the GitHub slug differs.
-
 ---
 
 ## Table of contents
@@ -454,6 +452,10 @@ Log in at <http://localhost:8080> with a tenant API key. The dashboard shows glo
 ---
 
 ## REST API
+
+**OpenAPI** specification: [`api/openapi.yaml`](api/openapi.yaml). It is also
+served by the app at `/swagger/openapi.yaml`, with the Swagger UI at
+<http://localhost:8080/swagger/>.
 
 ### Public routes
 
