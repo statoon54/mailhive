@@ -678,7 +678,11 @@ Pour envoyer réellement via SMTP, utilisez `SMTP_MODE=real` (défaut dans `dock
 3. Envoyer un mail via l'API (le mode par défaut est `SMTP_MODE=real`)
 4. Visualiser les mails reçus sur <http://localhost:8025>
 
-> **Note** : au démarrage en mode `real`, MailHive crée automatiquement un tenant admin et une config SMTP Mailpit par défaut si aucune n'existe.
+> **Note** : au démarrage, MailHive crée le tenant admin (`ADMIN_API_KEY`) s'il
+> n'existe pas, sauf en mode `simulation`. En mode `mailpit` (profil dev), il
+> seede en plus une config SMTP Mailpit **par défaut** pointant vers le conteneur
+> Mailpit. En mode `real` (prod), aucune config SMTP n'est seedée : l'administrateur
+> configure la sienne.
 
 ### Tests d'intégration SMTP
 

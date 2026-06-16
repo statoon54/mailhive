@@ -152,9 +152,9 @@ func runAll(cfg *config.Config) {
 		fatal("erreur de migration", "err", err)
 	}
 
-	// Seed Mailpit (mode réel)
+	// Seed des données par défaut (tenant admin ; + config Mailpit en mode dev)
 	if cfg.SMTPMode != "simulation" {
-		seedMailpitConfig(ctx, pool, cfg)
+		seedDefaults(ctx, pool, cfg)
 	}
 
 	var wg sync.WaitGroup
@@ -195,7 +195,7 @@ func runAPI(cfg *config.Config) {
 	}
 
 	if cfg.SMTPMode != "simulation" {
-		seedMailpitConfig(ctx, pool, cfg)
+		seedDefaults(ctx, pool, cfg)
 	}
 
 	startAPI(ctx, cfg, pool, redisClient)
@@ -514,9 +514,9 @@ func startWorker(ctx context.Context, cfg *config.Config, pool *pgxpool.Pool, re
 	slog.Info("worker arrêté", "component", "worker")
 }
 
-// ---------- Seed Mailpit ----------
+// ---------- Seed des données par défaut ----------
 
-func seedMailpitConfig(ctx context.Context, pool *pgxpool.Pool, cfg *config.Config) {
+func seedDefaults(ctx context.Context, pool *pgxpool.Pool, cfg *config.Config) {
 	tenantRepo := postgres.NewTenantRepository(pool)
 	smtpRepo := postgres.NewSMTPConfigRepository(pool)
 
@@ -547,6 +547,14 @@ func seedMailpitConfig(ctx context.Context, pool *pgxpool.Pool, cfg *config.Conf
 			tenant = t
 		}
 		slog.Info("tenant admin créé")
+	}
+
+	// La config SMTP Mailpit par défaut n'a de sens qu'avec le conteneur Mailpit
+	// du profil dev (SMTP_MODE=mailpit). En mode "real" (prod), l'administrateur
+	// configure son propre SMTP : on évite de seeder une config par défaut qui
+	// pointerait vers un hôte "mailpit" inexistant.
+	if cfg.SMTPMode != "mailpit" {
+		return
 	}
 
 	configs, err := smtpRepo.List(ctx, tenant.ID)
