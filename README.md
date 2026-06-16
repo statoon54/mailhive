@@ -13,8 +13,6 @@ Développé dans le cadre du projet MailHive
 
 ![Tableau de bord MailHive](img/mailhive-dashboard.png)
 
-> Les badges et URLs supposent le dépôt `github.com/statoon54/mailhive` — à ajuster si le slug GitHub diffère.
-
 ---
 
 ## Table des matières
@@ -783,6 +781,10 @@ Connectez-vous sur <http://localhost:8080> avec la clé API d'un tenant. Le dash
 ---
 
 ## API REST
+
+Spécification **OpenAPI** : [`api/openapi.yaml`](api/openapi.yaml). Elle est aussi
+servie par l'application sur `/swagger/openapi.yaml`, avec l'UI Swagger sur
+<http://localhost:8080/swagger/>.
 
 ### Routes publiques
 
