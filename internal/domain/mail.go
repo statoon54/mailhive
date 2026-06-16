@@ -47,32 +47,32 @@ const (
 
 // Mail représente un mail à envoyer ou envoyé.
 type Mail struct {
-	ID             uuid.UUID         `json:"id"`
-	TenantID       uuid.UUID         `json:"tenant_id"`
-	SMTPConfigID   *uuid.UUID        `json:"smtp_config_id,omitempty"`
-	TemplateID     *uuid.UUID        `json:"template_id,omitempty"`
-	FromEmail      string            `json:"from_email"`
-	FromName       string            `json:"from_name"`
-	Subject        string            `json:"subject"`
-	TextBody       string            `json:"text_body"`
-	HTMLBody       string            `json:"html_body"`
-	TemplateData   map[string]string `json:"template_data,omitempty"`
-	Attachments    []Attachment      `json:"attachments,omitempty"`
-	AttachmentRefs []AttachmentRef   `json:"attachment_refs,omitempty"`
-	Status         MailStatus        `json:"status"`
-	StatusMessage  string            `json:"status_message,omitempty"`
-	Attempts       int               `json:"attempts"`
+	Metadata       map[string]any    `json:"metadata,omitempty"`
 	ScheduledAt    *time.Time        `json:"scheduled_at,omitempty"`
 	SentAt         *time.Time        `json:"sent_at,omitempty"`
-	Priority       MailPriority      `json:"priority"`
-	TaskID         string            `json:"task_id,omitempty"`
-	Metadata       map[string]any    `json:"metadata,omitempty"`
+	SMTPConfigID   *uuid.UUID        `json:"smtp_config_id,omitempty"`
 	SpamScore      *float32          `json:"spam_score,omitempty"`
-	Tags           []string          `json:"tags,omitempty"`
+	TemplateData   map[string]string `json:"template_data,omitempty"`
+	TemplateID     *uuid.UUID        `json:"template_id,omitempty"`
+	CreatedAt      time.Time         `json:"created_at"`
+	ID             uuid.UUID         `json:"id"`
+	Priority       MailPriority      `json:"priority"`
+	Status         MailStatus        `json:"status"`
+	TenantID       uuid.UUID         `json:"tenant_id"`
+	UpdatedAt      time.Time         `json:"updated_at"`
+	FromEmail      string            `json:"from_email"`
+	FromName       string            `json:"from_name"`
+	HTMLBody       string            `json:"html_body"`
+	StatusMessage  string            `json:"status_message,omitempty"`
+	Subject        string            `json:"subject"`
+	TaskID         string            `json:"task_id,omitempty"`
+	TextBody       string            `json:"text_body"`
+	AttachmentRefs []AttachmentRef   `json:"attachment_refs,omitempty"`
+	Attachments    []Attachment      `json:"attachments,omitempty"`
 	CompressedBody []byte            `json:"-"`
 	Recipients     []MailRecipient   `json:"recipients,omitempty"`
-	CreatedAt      time.Time         `json:"created_at"`
-	UpdatedAt      time.Time         `json:"updated_at"`
+	Tags           []string          `json:"tags,omitempty"`
+	Attempts       int               `json:"attempts"`
 }
 
 // Attachment représente une pièce jointe.
@@ -174,8 +174,8 @@ type CreateMailRequest struct {
 	Subject      string            `json:"subject,omitempty"`
 	TextBody     string            `json:"text_body,omitempty"`
 	Attachments  []Attachment      `json:"attachments,omitempty"`
-	BCC          []EmailAddress    `json:"bcc,omitempty" validate:"omitempty,dive"`
-	CC           []EmailAddress    `json:"cc,omitempty" validate:"omitempty,dive"`
+	BCC          []EmailAddress    `json:"bcc,omitempty"            validate:"omitempty,dive"`
+	CC           []EmailAddress    `json:"cc,omitempty"             validate:"omitempty,dive"`
 	Tags         []string          `json:"tags,omitempty"`
 	To           []EmailAddress    `json:"to"                       validate:"required,min=1,dive"`
 	Individuel   bool              `json:"individuel,omitempty"`
