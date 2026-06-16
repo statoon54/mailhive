@@ -47,10 +47,11 @@ changelog:
     - title: Autres
       order: 999
   filters:
+    # Le scope optionnel (ex. docs(readme):) doit aussi être exclu.
     exclude:
-      - "^docs:"
-      - "^test:"
-      - "^chore:"
+      - '^docs(\(.+\))?:'
+      - '^test(\(.+\))?:'
+      - '^chore(\(.+\))?:'
       - "^Merge"
 
 release:
