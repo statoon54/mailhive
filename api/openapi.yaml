@@ -4,7 +4,7 @@ info:
   description: |
     API multi-tenant d'envoi et de gestion d'e-mails avec file d'attente asynchrone,
     templates embarqués et chiffrement SMTP.
-  version: 1.0.0
+  version: 1.1.0
   contact:
     name: Franck Paszkowski
 
@@ -157,6 +157,21 @@ paths:
                       }
                   cc:
                     - { "email": "manager@example.com" }
+              avecPieceJointe:
+                summary: Avec une pièce jointe (contenu en base64)
+                description: |
+                  Les pièces jointes sont fournies dans `attachments`, leur `content`
+                  encodé en base64. Le contenu est dédupliqué par tenant (un même
+                  fichier envoyé à N destinataires n'est stocké qu'une fois).
+                value:
+                  to:
+                    - { "email": "alice@example.com", "name": "Alice" }
+                  subject: "Votre document"
+                  html_body: "<p>Veuillez trouver le document ci-joint.</p>"
+                  attachments:
+                    - filename: "document.pdf"
+                      content_type: "application/pdf"
+                      content: "JVBERi0xLjQKJeLjz9MK...(base64)"
       responses:
         "202":
           description: |
@@ -232,6 +247,40 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MailApiResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /mails/{id}/attachments/{attachmentId}:
+    get:
+      tags: [Mails]
+      summary: Télécharger une pièce jointe d'un mail
+      description: |
+        Retourne le contenu binaire d'une pièce jointe. L'`attachmentId` provient
+        du champ `attachment_id` des `attachment_refs` du mail (voir GET /mails/{id}).
+      parameters:
+        - $ref: "#/components/parameters/ID"
+        - name: attachmentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Identifiant de la pièce jointe (attachment_refs[].attachment_id)
+      responses:
+        "200":
+          description: Contenu binaire de la pièce jointe
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: 'attachment; filename="..."'
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -1090,6 +1139,9 @@ components:
 
     Attachment:
       type: object
+      description: |
+        Pièce jointe en entrée (création de mail). Le contenu est dédupliqué par
+        tenant : un même fichier envoyé à N destinataires n'est stocké qu'une fois.
       required: [filename, content, content_type]
       properties:
         filename:
@@ -1100,6 +1152,24 @@ components:
           description: Contenu encodé en base64
         content_type:
           type: string
+
+    AttachmentRef:
+      type: object
+      description: |
+        Métadonnées d'une pièce jointe côté lecture (réponse). Le contenu n'y
+        figure pas : il se télécharge via GET /mails/{id}/attachments/{attachment_id}.
+      properties:
+        attachment_id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        content_type:
+          type: string
+        size:
+          type: integer
+          format: int64
+          description: Taille du contenu en octets
 
     MailStatus:
       type: string
@@ -1164,10 +1234,13 @@ components:
           type: object
           additionalProperties:
             type: string
-        attachments:
+        attachment_refs:
           type: array
+          description: |
+            Métadonnées des pièces jointes liées au mail (sans le contenu). Le
+            contenu se télécharge via GET /mails/{id}/attachments/{attachment_id}.
           items:
-            $ref: "#/components/schemas/Attachment"
+            $ref: "#/components/schemas/AttachmentRef"
         status:
           $ref: "#/components/schemas/MailStatus"
         status_message:
