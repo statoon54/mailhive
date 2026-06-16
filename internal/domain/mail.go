@@ -174,8 +174,8 @@ type CreateMailRequest struct {
 	Subject      string            `json:"subject,omitempty"`
 	TextBody     string            `json:"text_body,omitempty"`
 	Attachments  []Attachment      `json:"attachments,omitempty"`
-	BCC          []EmailAddress    `json:"bcc,omitempty"`
-	CC           []EmailAddress    `json:"cc,omitempty"`
+	BCC          []EmailAddress    `json:"bcc,omitempty" validate:"omitempty,dive"`
+	CC           []EmailAddress    `json:"cc,omitempty" validate:"omitempty,dive"`
 	Tags         []string          `json:"tags,omitempty"`
 	To           []EmailAddress    `json:"to"                       validate:"required,min=1,dive"`
 	Individuel   bool              `json:"individuel,omitempty"`
