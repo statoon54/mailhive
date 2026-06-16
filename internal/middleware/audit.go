@@ -14,9 +14,9 @@ import (
 
 // bodyCapture capture le body écrit dans la réponse tout en le transmettant au client.
 type bodyCapture struct {
+	buf bytes.Buffer
 	http.ResponseWriter
 	code int
-	buf  bytes.Buffer
 }
 
 // WriteHeader capture le code de statut HTTP avant de le transmettre.
@@ -90,7 +90,18 @@ func AuditMiddleware(auditService port.AuditLogService) echo.MiddlewareFunc {
 			// Récupérer les détails métier posés par le handler
 			details, _ := c.Get("audit_details").(string)
 
-			auditService.Log(tenantID, action, resourceType, resourceID, status, statusCode, errorMessage, details, method, path)
+			auditService.Log(
+				tenantID,
+				action,
+				resourceType,
+				resourceID,
+				status,
+				statusCode,
+				errorMessage,
+				details,
+				method,
+				path,
+			)
 
 			return err
 		}

@@ -8,19 +8,19 @@ import (
 
 // AuditLog représente une entrée du journal d'audit.
 type AuditLog struct {
+	CreatedAt    time.Time `json:"created_at"`
 	ID           uuid.UUID `json:"id"`
 	TenantID     uuid.UUID `json:"tenant_id"`
-	TenantName   string    `json:"tenant_name,omitempty"`
 	Action       string    `json:"action"`
-	ResourceType string    `json:"resource_type"`
-	ResourceID   string    `json:"resource_id,omitempty"`
-	Status       string    `json:"status"`
-	StatusCode   int       `json:"status_code"`
-	ErrorMessage string    `json:"error_message,omitempty"`
 	Details      string    `json:"details,omitempty"`
+	ErrorMessage string    `json:"error_message,omitempty"`
 	Method       string    `json:"method"`
 	Path         string    `json:"path"`
-	CreatedAt    time.Time `json:"created_at"`
+	ResourceID   string    `json:"resource_id,omitempty"`
+	ResourceType string    `json:"resource_type"`
+	Status       string    `json:"status"`
+	TenantName   string    `json:"tenant_name,omitempty"`
+	StatusCode   int       `json:"status_code"`
 }
 
 // AuditLogFilter contient les critères de filtrage pour le journal d'audit.

@@ -36,11 +36,13 @@ Développé dans le cadre du projet MailHive
   - [Infrastructure Docker](#infrastructure-docker)
     - [Sous-commandes du binaire](#sous-commandes-du-binaire)
     - [Stockage des pièces jointes (S3 / SeaweedFS)](#stockage-des-pièces-jointes-s3--seaweedfs)
+      - [Inspecter le contenu stocké](#inspecter-le-contenu-stocké)
   - [Installation](#installation)
     - [Prérequis](#prérequis)
     - [Démarrage rapide](#démarrage-rapide)
     - [Développement local (sans Docker)](#développement-local-sans-docker)
     - [Déploiement en production](#déploiement-en-production)
+      - [Sans Compose (services existants)](#sans-compose-services-existants)
   - [Configuration](#configuration)
     - [Mode simulation SMTP](#mode-simulation-smtp)
     - [Mailpit — Serveur SMTP de test](#mailpit--serveur-smtp-de-test)
@@ -561,7 +563,7 @@ s'appliquent automatiquement au lancement. Seul le port `8080` est exposé.
 - faire tourner les identifiants S3 dans `docker/seaweedfs/s3.json` et aligner
   `BLOB_S3_ACCESS_KEY` / `BLOB_S3_SECRET_KEY` ;
 - pour un S3 externe (AWS S3, R2, MinIO managé) : renseigner `BLOB_S3_ENDPOINT`
-  + identifiants, puis retirer le service `seaweedfs` et sa dépendance ;
+  - identifiants, puis retirer le service `seaweedfs` et sa dépendance ;
 - `MAILHIVE_IMAGE` permet de surcharger le dépôt de l'image.
 
 #### Sans Compose (services existants)

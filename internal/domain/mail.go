@@ -163,38 +163,38 @@ func (ft *FlexTime) TimePtr() *time.Time {
 
 // CreateMailRequest contient les données pour composer un mail.
 type CreateMailRequest struct {
-	SMTPConfigID *uuid.UUID        `json:"smtp_config_id,omitempty"`
-	TemplateID   *uuid.UUID        `json:"template_id,omitempty"`
 	From         *EmailAddress     `json:"from,omitempty"`
-	To           []EmailAddress    `json:"to"                       validate:"required,min=1,dive"`
-	CC           []EmailAddress    `json:"cc,omitempty"`
-	BCC          []EmailAddress    `json:"bcc,omitempty"`
+	Metadata     map[string]any    `json:"metadata,omitempty"`
+	Priority     *MailPriority     `json:"priority,omitempty"`
+	ScheduledAt  *FlexTime         `json:"scheduled_at,omitempty"`
+	SMTPConfigID *uuid.UUID        `json:"smtp_config_id,omitempty"`
+	TemplateData map[string]string `json:"template_data,omitempty"`
+	TemplateID   *uuid.UUID        `json:"template_id,omitempty"`
+	HTMLBody     string            `json:"html_body,omitempty"`
 	Subject      string            `json:"subject,omitempty"`
 	TextBody     string            `json:"text_body,omitempty"`
-	HTMLBody     string            `json:"html_body,omitempty"`
-	TemplateData map[string]string `json:"template_data,omitempty"`
 	Attachments  []Attachment      `json:"attachments,omitempty"`
-	Priority     *MailPriority     `json:"priority,omitempty"`
-	Metadata     map[string]any    `json:"metadata,omitempty"`
+	BCC          []EmailAddress    `json:"bcc,omitempty"`
+	CC           []EmailAddress    `json:"cc,omitempty"`
 	Tags         []string          `json:"tags,omitempty"`
-	ScheduledAt  *FlexTime         `json:"scheduled_at,omitempty"`
+	To           []EmailAddress    `json:"to"                       validate:"required,min=1,dive"`
 	Individuel   bool              `json:"individuel,omitempty"`
 }
 
 // CreateMailBatchResponse représente la réponse lors d'un envoi individuel (N mails créés).
 type CreateMailBatchResponse struct {
-	Total   int         `json:"total"`
 	MailIDs []uuid.UUID `json:"mail_ids"`
+	Total   int         `json:"total"`
 }
 
 // MailListFilter contient les critères de filtrage pour la liste des mails.
 type MailListFilter struct {
 	Status  *MailStatus `json:"status,omitempty"`
-	Tags    []string    `json:"tags,omitempty"`
-	TagMode string      `json:"tag_mode,omitempty"` // "and" (défaut) ou "or"
 	Query   string      `json:"q,omitempty"`
-	Page    int         `json:"page"`
+	TagMode string      `json:"tag_mode,omitempty"` // "and" (défaut) ou "or"
+	Tags    []string    `json:"tags,omitempty"`
 	Limit   int         `json:"limit"`
+	Page    int         `json:"page"`
 }
 
 // MailStats contient les statistiques d'envoi de mails d'un tenant.
