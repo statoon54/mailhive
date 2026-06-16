@@ -73,6 +73,25 @@ func TestMailHandler_Create_ValidationError(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
+func TestMailHandler_Create_InvalidCC(t *testing.T) {
+	tenantID := uuid.New()
+	svc := &mocks.MockMailService{}
+	h := NewMailHandler(svc)
+
+	body := map[string]any{
+		"to":        []map[string]string{{"email": "valide@example.com"}},
+		"cc":        []map[string]string{{"email": "pas-une-adresse"}},
+		"subject":   "Test",
+		"text_body": "Hello",
+	}
+	c, rec := newTestContext(http.MethodPost, "/api/v1/mails", body)
+	setTenantCtx(c, tenantID.String(), "tenant")
+
+	err := h.Create(c)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
 func TestMailHandler_List_Default(t *testing.T) {
 	tenantID := uuid.New()
 	svc := &mocks.MockMailService{
