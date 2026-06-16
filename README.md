@@ -478,7 +478,7 @@ Avec l'AWS CLI : `aws --endpoint-url http://localhost:8333 --region us-east-1
 s3 ls s3://mailhive-attachments/ --recursive` (identifiants `mailhive` /
 `mailhive_secret`).
 
-> Le script de charge `send_2000_mails_attachments.sh` génère une pièce jointe de
+> Le script de charge `scripts/send_mails_attachments.sh` génère une pièce jointe de
 > zéros (faux PDF) : un objet récupéré fera la bonne taille mais ne s'ouvrira pas
 > comme un vrai PDF — vérifier avec `wc -c` plutôt que par un aperçu.
 
