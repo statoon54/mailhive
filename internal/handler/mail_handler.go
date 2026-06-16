@@ -216,13 +216,13 @@ func (h *MailHandler) StatsByTenant(c *echo.Context) error {
 
 // mailAuditDetails représente les détails d'audit pour un envoi de mail (JSON).
 type mailAuditDetails struct {
+	HTMLBody      string               `json:"html_body,omitempty"`
+	Sujet         string               `json:"sujet"`
+	TextBody      string               `json:"text_body,omitempty"`
 	Destinataires []mailAuditRecipient `json:"destinataires"`
+	SujetExemples []string             `json:"sujet_exemples,omitempty"`
 	TotalDest     int                  `json:"total_destinataires"`
 	TotalMails    int                  `json:"total_mails"`
-	Sujet         string               `json:"sujet"`
-	SujetExemples []string             `json:"sujet_exemples,omitempty"`
-	TextBody      string               `json:"text_body,omitempty"`
-	HTMLBody      string               `json:"html_body,omitempty"`
 }
 
 // mailAuditRecipient représente un destinataire dans les détails d'audit.

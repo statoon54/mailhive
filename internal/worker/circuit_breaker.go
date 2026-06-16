@@ -35,8 +35,8 @@ type CircuitBreakerRegistry struct {
 
 // CircuitBreakerConfig contient les paramètres du circuit breaker.
 type CircuitBreakerConfig struct {
-	FailureThreshold int           // Nombre d'échecs consécutifs avant ouverture (défaut: 5)
 	CooldownPeriod   time.Duration // Durée avant de passer en half-open (défaut: 30s)
+	FailureThreshold int           // Nombre d'échecs consécutifs avant ouverture (défaut: 5)
 }
 
 // DefaultCircuitBreakerConfig retourne la configuration par défaut.

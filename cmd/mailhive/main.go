@@ -84,7 +84,11 @@ func main() {
 	case "worker":
 		runWorker(cfg)
 	default:
-		fmt.Fprintf(os.Stderr, "Commande inconnue : %s\nUsage : mailhive [serve|api|worker|migrate|migrate-down|version]\n", cmd)
+		fmt.Fprintf(
+			os.Stderr,
+			"Commande inconnue : %s\nUsage : mailhive [serve|api|worker|migrate|migrate-down|version]\n",
+			cmd,
+		)
 		os.Exit(1)
 	}
 }
@@ -99,7 +103,12 @@ func fatal(msg string, args ...any) {
 // configuré (postgres par défaut, ou s3 compatible SeaweedFS/MinIO). Si le
 // backend s3 est demandé mais injoignable, on échoue au démarrage (fatal)
 // plutôt que de stocker silencieusement dans le mauvais backend.
-func buildAttachmentService(ctx context.Context, cfg *config.Config, pool *pgxpool.Pool, component string) *service.AttachmentService {
+func buildAttachmentService(
+	ctx context.Context,
+	cfg *config.Config,
+	pool *pgxpool.Pool,
+	component string,
+) *service.AttachmentService {
 	repo := postgres.NewAttachmentRepository(pool)
 
 	if cfg.Blob.Backend == domain.AttachmentStorageS3 {
@@ -107,7 +116,15 @@ func buildAttachmentService(ctx context.Context, cfg *config.Config, pool *pgxpo
 		if err != nil {
 			fatal("erreur d'initialisation du stockage S3 des pièces jointes", "component", component, "err", err)
 		}
-		slog.Info("stockage des pièces jointes : S3", "component", component, "endpoint", cfg.Blob.S3Endpoint, "bucket", cfg.Blob.S3Bucket)
+		slog.Info(
+			"stockage des pièces jointes : S3",
+			"component",
+			component,
+			"endpoint",
+			cfg.Blob.S3Endpoint,
+			"bucket",
+			cfg.Blob.S3Bucket,
+		)
 		return service.NewAttachmentService(repo, store, domain.AttachmentStorageS3)
 	}
 
@@ -160,18 +177,14 @@ func runAll(cfg *config.Config) {
 	var wg sync.WaitGroup
 
 	// Lancer l'API
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		startAPI(ctx, cfg, pool, redisClient)
-	}()
+	})
 
 	// Lancer le Worker
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		startWorker(ctx, cfg, pool, redisClient)
-	}()
+	})
 
 	wg.Wait()
 	slog.Info("arrêt complet")
@@ -270,7 +283,15 @@ func startAPI(ctx context.Context, cfg *config.Config, pool *pgxpool.Pool, redis
 	}
 	analysisService := service.NewAnalysisService(templateRepo)
 	attachmentService := buildAttachmentService(ctx, cfg, pool, "api")
-	mailService := service.NewMailService(mailRepo, smtpRepo, templateRepo, tenantRepo, queueClient, analysisService, attachmentService)
+	mailService := service.NewMailService(
+		mailRepo,
+		smtpRepo,
+		templateRepo,
+		tenantRepo,
+		queueClient,
+		analysisService,
+		attachmentService,
+	)
 	brandingService := service.NewBrandingService(brandingRepo)
 	auditLogService := service.NewAuditLogService(auditLogRepo)
 	llmService := service.NewLLMService(cfg.LLM)

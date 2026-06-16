@@ -90,16 +90,16 @@ func fusionnerTemplateData(shared, perRecipient map[string]string) map[string]st
 
 // creerMailParams contient les paramètres pour créer un mail unitaire.
 type creerMailParams struct {
-	tenantID  uuid.UUID
+	data      map[string]string
+	req       *domain.CreateMailRequest
+	tenant    *domain.Tenant
+	tmpl      *domain.Template
+	priority  domain.MailPriority
 	smtpCfgID uuid.UUID
+	tenantID  uuid.UUID
 	fromEmail string
 	fromName  string
-	priority  domain.MailPriority
-	req       *domain.CreateMailRequest
-	tmpl      *domain.Template
-	data      map[string]string
 	toAddrs   []domain.EmailAddress
-	tenant    *domain.Tenant
 }
 
 // creerMail crée un mail unitaire : rendu template, sauvegarde, recipients, enqueue.
@@ -114,9 +114,16 @@ func (s *MailService) creerMail(ctx context.Context, p creerMailParams) (*domain
 	spamScore := s.analysisService.ComputeSpamScore(p.req.Subject, p.req.TextBody, p.req.HTMLBody)
 
 	// Vérifier le seuil spam du tenant
-	if p.tenant != nil && p.tenant.Settings.SpamScoreThreshold != nil && spamScore > *p.tenant.Settings.SpamScoreThreshold {
-		if p.tenant.Settings.SpamScoreAction != nil && *p.tenant.Settings.SpamScoreAction == domain.SpamScoreActionBlock {
-			return nil, fmt.Errorf("%w (score: %.1f, seuil: %.1f)", domain.ErrSpamBlocked, spamScore, *p.tenant.Settings.SpamScoreThreshold)
+	if p.tenant != nil && p.tenant.Settings.SpamScoreThreshold != nil &&
+		spamScore > *p.tenant.Settings.SpamScoreThreshold {
+		if p.tenant.Settings.SpamScoreAction != nil &&
+			*p.tenant.Settings.SpamScoreAction == domain.SpamScoreActionBlock {
+			return nil, fmt.Errorf(
+				"%w (score: %.1f, seuil: %.1f)",
+				domain.ErrSpamBlocked,
+				spamScore,
+				*p.tenant.Settings.SpamScoreThreshold,
+			)
 		}
 		slog.Warn("score spam au-dessus du seuil du tenant",
 			"tenant_id", p.tenantID,
