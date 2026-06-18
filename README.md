@@ -53,6 +53,7 @@ Développé dans le cadre du projet MailHive
     - [Authentification](#authentification)
     - [Envoyer un mail](#envoyer-un-mail)
     - [Avec CC/BCC et pièce jointe](#avec-ccbcc-et-pièce-jointe)
+    - [Envoi avec un template](#envoi-avec-un-template)
     - [Planifier un envoi différé](#planifier-un-envoi-différé)
     - [Interface web](#interface-web)
   - [API REST](#api-rest)
@@ -801,6 +802,24 @@ curl -X POST http://localhost:8080/api/v1/mails \
     "attachments": [
       {"filename": "doc.txt", "content_type": "text/plain", "content": "Qm9uam91ciA6KQ=="}
     ]
+  }'
+```
+
+### Envoi avec un template
+
+Le template est supposé déjà créé via l'interface web (page **Templates**) ; son
+`id` y est visible (ou via `GET /api/v1/templates`). Le sujet et le corps sont
+**rendus depuis le template** avec les `template_data` — ne pas fournir
+`subject`/`html_body` dans la requête, sinon ils priment.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/mails \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": [{"email": "marie@example.com", "name": "Marie"}],
+    "template_id": "<TEMPLATE_ID>",
+    "template_data": {"name": "Marie", "code": "A1B2C3"}
   }'
 ```
 
