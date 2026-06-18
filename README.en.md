@@ -134,90 +134,20 @@ The project follows a **hexagonal architecture** (ports & adapters) with a stric
 ### Mail sending flow
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    participant Client as Client (Frontend / curl)
-    participant API as API (Echo)
-    participant MailSvc as MailService
-    participant QC as QueueClient (Adapter)
-    participant AsynqC as asynq.Client
-    participant PG as PostgreSQL
-    participant Blob as BlobStore (S3/Postgres)
-    participant Redis as Redis
-    participant AsynqS as asynq.Server
-    participant MailH as MailHandler
-    participant SMTP as SMTP server
-
-    rect rgb(230, 245, 255)
-    Note over Client,Redis: Phase 1 — API: persist & push the IDs onto the queue
-    Client->>API: POST /api/v1/mails (JWT + payload)
-    API->>MailSvc: Create(tenantID, CreateMailRequest)
-    opt Attachments present
-        MailSvc->>MailSvc: storeAttachments: base64 decode + SHA-256
-        MailSvc->>PG: AttachmentRepository.UpsertMeta(tenant, sha256)<br/>dedup: one row per content
-        MailSvc->>Blob: Put(tenant, sha256, content)<br/>only if the content is new
-    end
-    MailSvc->>PG: INSERT mail (status=pending) via MailRepository
-    MailSvc->>PG: INSERT recipients + mail_attachments (mail→attachment links)
-    Note over MailSvc,QC: Only IDs are passed,<br/>not the full data
-    MailSvc->>QC: EnqueueMailSend(mailID, tenantID, priority, scheduledAt)
-    QC->>AsynqC: Enqueue(task {mail_id, tenant_id})
-    AsynqC->>Redis: PUSH into asynq:{queue}
-    Redis-->>AsynqC: OK
-    AsynqC-->>QC: taskID
-    QC-->>MailSvc: taskID
-    MailSvc->>PG: UPDATE status=queued, task_id
-    API-->>Client: 201 Created
-    end
-
-    rect rgb(255, 245, 230)
-    Note over Redis,SMTP: Phase 2 — Worker: rebuild the context from the DB
-    AsynqS->>Redis: BRPOPLPUSH (polling)
-    Redis-->>AsynqS: task {mail_id, tenant_id}
-    AsynqS->>MailH: HandleMailSend(ctx, task)
-    MailH->>PG: MailRepository.GetByID(tenant_id, mail_id)
-    PG-->>MailH: mail (from, subject, template_id, template_data...)
-    MailH->>PG: MailRepository.GetRecipients(mail_id)
-    PG-->>MailH: []recipients
-
-    opt Attachments linked to the mail
-        MailH->>PG: MailRepository.GetAttachmentRefs(mail_id)
-        PG-->>MailH: []refs (filename, sha256, content_type)
-        loop for each attachment
-            MailH->>Blob: AttachmentService.Load(tenant, sha256)
-            Blob-->>MailH: content
-        end
-        MailH->>MailH: rebuild mail.Attachments (base64) before sending
-    end
-
-    opt Deferred template rendering (empty subject/body)
-        MailH->>PG: TemplateRepository.GetByID(tenant_id, template_id)
-        PG-->>MailH: template (subject_tmpl, text_body, html_body)
-        MailH->>MailH: Compile + Render(template, template_data)
-    end
-
-    MailH->>PG: TenantRepository.GetByID(tenant_id)
-    PG-->>MailH: tenant (rate_limit, rate_burst)
-    MailH->>MailH: Rate limiter (tenant)
-
-    MailH->>PG: SMTPConfigRepository.GetByID(tenant_id, smtp_config_id)
-    PG-->>MailH: smtp_config (host, port, auth, encrypted password)
-    MailH->>MailH: SMTPConfigService.DecryptPassword()
-
-    MailH->>PG: MailRepository.UpdateStatus(sending) + IncrementAttempts
-    MailH->>SMTP: sender.Send(smtp_config, mail)
-
-    alt Success
-        SMTP-->>MailH: OK
-        MailH->>PG: MailRepository.UpdateStatus(sent) + SetSentAt
-    else Permanent error
-        MailH->>PG: MailRepository.UpdateStatus(failed)
-        MailH-->>AsynqS: SkipRetry
-    else Temporary error + retries left
-        MailH->>PG: MailRepository.UpdateStatus(pending)
-        MailH-->>AsynqS: error → retry (exponential backoff)
-    end
-    end
+flowchart TD
+    A([Client / curl]) -->|POST /api/v1/mails| B["API + MailService<br/>(Phase 1)"]
+    B -->|attachments: SHA-256 + dedup| C[("BlobStore<br/>S3 or Postgres")]
+    B -->|INSERT mail, recipients, attachment links| D[("PostgreSQL")]
+    B -->|enqueue mail_id + tenant_id| E[["Asynq / Redis"]]
+    B -->|status = queued| D
+    E -.->|at scheduled_at| F["Worker MailHandler<br/>(Phase 2)"]
+    F -->|read mail, recipients, attachment refs| D
+    F -->|load attachment content| C
+    F -->|template render, rate limit, SMTP password| D
+    F -->|send| G["SMTP server"]
+    G -->|success| H([status = sent])
+    G -->|permanent error| I([status = failed])
+    G -->|temporary error| J([retry · backoff])
 ```
 
 ---
@@ -315,6 +245,34 @@ The app is available at:
 - **REST API**: <http://localhost:8080/api/v1>
 - **Swagger UI**: <http://localhost:8080/swagger/>
 - **Mailpit** (dev profile): <http://localhost:8025>
+
+#### Make shortcuts
+
+```bash
+make docker-dev       # stack + Mailpit (dev profile) — seeds a default Mailpit SMTP config
+make docker-dev-s3    # same + SeaweedFS (attachments on S3)
+make docker-down      # stop
+make docker-logs      # follow logs
+```
+
+> `make docker-dev` is the easiest for a full local test: it starts Mailpit and
+> seeds the default SMTP config (`mailpit` mode), so the send below works without
+> any manual configuration.
+
+#### First mail send
+
+```bash
+# 1) Get an admin token
+TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/token \
+  -H "Content-Type: application/json" -d '{"api_key":"admin-dev-key"}' | jq -r '.data.token')
+
+# 2) Send a mail (then visible at http://localhost:8025)
+curl -s -X POST http://localhost:8080/api/v1/mails \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"to":[{"email":"dest@example.com","name":"Dest"}],"subject":"Hello MailHive","html_body":"<p>Hello!</p>"}' | jq
+```
+
+More examples (CC/BCC, attachment, scheduled) in the [Usage](#usage) section.
 
 ### Local development (without Docker)
 
@@ -441,9 +399,64 @@ curl -X POST http://localhost:8080/api/v1/mails \
   }'
 ```
 
+### With CC/BCC and attachment
+
+Attachments go in `attachments`, their `content` **base64**-encoded:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/mails \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to":  [{"email": "dest@example.com", "name": "Recipient"}],
+    "cc":  [{"email": "copy@example.com"}],
+    "bcc": [{"email": "archive@example.com"}],
+    "subject": "Document attached",
+    "html_body": "<p>Please find the document attached.</p>",
+    "attachments": [
+      {"filename": "doc.txt", "content_type": "text/plain", "content": "SGVsbG8gOik="}
+    ]
+  }'
+```
+
+### Send with a template
+
+The template is assumed already created via the web UI (**Templates** page); its
+`id` is shown there (or via `GET /api/v1/templates`). Subject and body are
+**rendered from the template** with `template_data` — do not pass `subject`/`html_body`
+in the request, otherwise they take precedence.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/mails \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": [{"email": "marie@example.com", "name": "Marie"}],
+    "template_id": "<TEMPLATE_ID>",
+    "template_data": {"name": "Marie", "code": "A1B2C3"}
+  }'
+```
+
 ### Schedule a deferred send
 
-Add `scheduled_at` to the payload. Accepted formats: RFC3339 (`2026-03-10T09:00:00Z`), with offset (`...+02:00`), datetime with `T` or space (`2026-03-10 09:00:00`), or date only (`2026-03-10`).
+Add `scheduled_at` to the payload (prefer RFC3339 **UTC** with `...Z`; a "naked"
+datetime is interpreted in the server timezone, not yours):
+
+```bash
+curl -X POST http://localhost:8080/api/v1/mails \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": [{"email": "dest@example.com", "name": "Recipient"}],
+    "subject": "Reminder",
+    "html_body": "<p>Scheduled mail.</p>",
+    "scheduled_at": "2026-03-10T09:00:00Z"
+  }'
+```
+
+Accepted formats: RFC3339 (`2026-03-10T09:00:00Z`), with offset (`...+02:00`),
+datetime with `T` or space (`2026-03-10 09:00:00`), or date only (`2026-03-10`).
+A past or absent date sends immediately.
 
 ### Web UI
 

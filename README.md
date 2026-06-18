@@ -266,99 +266,20 @@ internal/
 ### Flux d'envoi d'un mail
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    participant Client as Client (Frontend / curl)
-    participant API as API (Echo)
-    participant MailSvc as MailService
-    participant QC as QueueClient (Adapter)
-    participant AsynqC as asynq.Client
-    participant PG as PostgreSQL
-    participant Blob as BlobStore (S3/Postgres)
-    participant Redis as Redis
-    participant AsynqS as asynq.Server
-    participant MailH as MailHandler
-    participant SMTP as Serveur SMTP
-
-    rect rgb(230, 245, 255)
-    Note over Client,Redis: Phase 1 — API : Persister & envoyer les IDs dans la queue
-    Client->>API: POST /api/v1/mails (JWT + payload)
-    API->>MailSvc: Create(tenantID, CreateMailRequest)
-    opt Pièces jointes présentes
-        MailSvc->>MailSvc: storeAttachments : décode base64 + SHA-256
-        MailSvc->>PG: AttachmentRepository.UpsertMeta(tenant, sha256)<br/>déduplication : 1 ligne par contenu
-        MailSvc->>Blob: Put(tenant, sha256, contenu)<br/>uniquement si le contenu est nouveau
-    end
-    MailSvc->>PG: INSERT mail (status=pending) via MailRepository
-    MailSvc->>PG: INSERT recipients + mail_attachments (liens mail→PJ)
-    Note over MailSvc,QC: Seuls les IDs sont transmis,<br/>pas les données complètes
-    MailSvc->>QC: EnqueueMailSend(mailID, tenantID, priority, scheduledAt)
-    QC->>QC: NewMailSendTask() → payload = {mail_id, tenant_id}
-    QC->>AsynqC: Enqueue(task)
-    AsynqC->>Redis: PUSH {mail_id, tenant_id}<br/>dans asynq:{queue}
-    Redis-->>AsynqC: OK
-    AsynqC-->>QC: taskID
-    QC-->>MailSvc: taskID
-    MailSvc->>PG: UPDATE status=queued, task_id
-    API-->>Client: 201 Created
-    end
-
-    rect rgb(255, 245, 230)
-    Note over Redis,SMTP: Phase 2 — Worker : Reconstruire le contexte depuis la BDD
-    AsynqS->>Redis: BRPOPLPUSH (polling)
-    Redis-->>AsynqS: task {mail_id, tenant_id}
-    AsynqS->>MailH: HandleMailSend(ctx, task)
-    MailH->>MailH: Unmarshal → {mail_id, tenant_id}
-
-    Note over MailH,PG: Le worker utilise les mêmes<br/>ports/repos que l'API pour<br/>reconstruire toutes les données
-    MailH->>PG: MailRepository.GetByID(tenant_id, mail_id)
-    PG-->>MailH: mail (from, subject, template_id, template_data...)
-    MailH->>PG: MailRepository.GetRecipients(mail_id)
-    PG-->>MailH: []recipients
-
-    opt Pièces jointes liées au mail
-        MailH->>PG: MailRepository.GetAttachmentRefs(mail_id)
-        PG-->>MailH: []refs (filename, sha256, content_type)
-        loop pour chaque pièce jointe
-            MailH->>Blob: AttachmentService.Load(tenant, sha256)
-            Blob-->>MailH: contenu
-        end
-        MailH->>MailH: reconstitue mail.Attachments (base64) avant l'envoi
-    end
-
-    opt Rendu template différé (subject/body vides)
-        MailH->>PG: TemplateRepository.GetByID(tenant_id, template_id)
-        PG-->>MailH: template (subject_tmpl, text_body, html_body)
-        MailH->>MailH: Compile + Render(template, template_data)<br/>→ subject, textBody, htmlBody
-    end
-
-    MailH->>MailH: Rate Limiter (tenant)
-    MailH->>PG: TenantRepository.GetByID(tenant_id)
-    PG-->>MailH: tenant (rate_limit, rate_burst)
-
-    MailH->>PG: SMTPConfigRepository.GetByID(tenant_id, smtp_config_id)
-    PG-->>MailH: smtp_config (host, port, auth, password chiffré)
-    MailH->>MailH: SMTPConfigService.DecryptPassword()
-
-    MailH->>PG: MailRepository.UpdateStatus(sending) + IncrementAttempts
-    MailH->>SMTP: sender.Send(smtp_config, mail)
-
-    alt Succès
-        SMTP-->>MailH: OK
-        MailH->>PG: MailRepository.UpdateStatus(sent) + SetSentAt
-    else Erreur permanente
-        MailH->>PG: MailRepository.UpdateStatus(failed)
-        MailH-->>AsynqS: SkipRetry
-    else Erreur temporaire + retries restants
-        MailH->>PG: MailRepository.UpdateStatus(pending)
-        MailH-->>AsynqS: error → retry (backoff exponentiel)
-    end
-    end
-
-    rect rgb(240, 255, 240)
-    Note over QC,PG: Repositories partagés entre API et Worker
-    Note over QC,PG: MailRepository — lecture/écriture des mails<br/>SMTPConfigRepository — configs SMTP<br/>TemplateRepository — templates de mail<br/>TenantRepository — tenants et rate limits<br/>AttachmentRepository — métadonnées des PJ (dédup par sha256)<br/>BlobStore — contenu des PJ (S3 ou table attachment_blobs)<br/><br/>Mêmes interfaces (port.*),<br/>mêmes implémentations,<br/>instances séparées (pools de connexion distincts)
-    end
+flowchart TD
+    A([Client / curl]) -->|POST /api/v1/mails| B["API + MailService<br/>(Phase 1)"]
+    B -->|pièces jointes : SHA-256 + dédup| C[("BlobStore<br/>S3 ou Postgres")]
+    B -->|INSERT mail, destinataires, liens PJ| D[("PostgreSQL")]
+    B -->|enqueue mail_id + tenant_id| E[["Asynq / Redis"]]
+    B -->|status = queued| D
+    E -.->|à scheduled_at| F["Worker MailHandler<br/>(Phase 2)"]
+    F -->|lit mail, destinataires, refs PJ| D
+    F -->|charge le contenu des PJ| C
+    F -->|rendu template, rate limit, mot de passe SMTP| D
+    F -->|envoi| G["Serveur SMTP"]
+    G -->|succès| H([status = sent])
+    G -->|erreur permanente| I([status = failed])
+    G -->|erreur temporaire| J([retry · backoff])
 ```
 
 ---
