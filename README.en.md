@@ -333,7 +333,7 @@ make build             # build frontend then Go binary (with embed)
 
 ```bash
 # Provide secrets via a .env file (or the environment)
-MAILHIVE_TAG=0.1.0 docker compose -f docker-compose.prod.yml up -d
+MAILHIVE_TAG=latest docker compose -f docker-compose.prod.yml up -d
 # or: make docker-prod
 ```
 
@@ -358,7 +358,7 @@ docker run -d -p 8080:8080 \
   -e REDIS_ADDR=redis.internal:6379 \
   -e JWT_SECRET=… -e ENCRYPTION_KEY=… -e ADMIN_API_KEY=… \
   -e BLOB_BACKEND=postgres \
-  ghcr.io/statoon54/mailhive:0.1.0
+  ghcr.io/statoon54/mailhive:latest
 ```
 
 Only **PostgreSQL and a Redis-compatible server** are mandatory; an S3 object store is only needed with `BLOB_BACKEND=s3`. Migrations run at startup.

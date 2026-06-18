@@ -40,6 +40,8 @@ Développé dans le cadre du projet MailHive
   - [Installation](#installation)
     - [Prérequis](#prérequis)
     - [Démarrage rapide](#démarrage-rapide)
+      - [Raccourcis Make](#raccourcis-make)
+      - [Premier envoi de mail](#premier-envoi-de-mail)
     - [Développement local (sans Docker)](#développement-local-sans-docker)
     - [Déploiement en production](#déploiement-en-production)
       - [Sans Compose (services existants)](#sans-compose-services-existants)
@@ -50,6 +52,7 @@ Développé dans le cadre du projet MailHive
   - [Utilisation](#utilisation)
     - [Authentification](#authentification)
     - [Envoyer un mail](#envoyer-un-mail)
+    - [Avec CC/BCC et pièce jointe](#avec-ccbcc-et-pièce-jointe)
     - [Planifier un envoi différé](#planifier-un-envoi-différé)
     - [Interface web](#interface-web)
   - [API REST](#api-rest)
@@ -412,7 +415,7 @@ L'application se distribue comme un **binaire unique** embarquant le frontend Re
 | --------- | ------- | ------ | ------ |
 | **mailhive** | Build multi-stage (Node + Go) | 8080 | API REST + Worker + Frontend SPA |
 | **postgres** | postgres:18-alpine | 5432 | Base de données principale |
-| **redis** | redis:7-alpine | 6379 | Cache + backend de la file d'attente |
+| **redis** | valkey/valkey:8-alpine | 6379 | Cache + backend de la file d'attente (compatible Redis) |
 | **mailpit** | axllent/mailpit | 1025 / 8025 | Serveur SMTP de test (profil `dev` uniquement) |
 | **seaweedfs** | chrislusf/seaweedfs | 8333 (S3) / 8888 (filer) | Object store S3 local pour tester `BLOB_BACKEND=s3` (profil `dev` uniquement) |
 
@@ -518,6 +521,34 @@ L'application est accessible sur :
 - **Swagger UI** : <http://localhost:8080/swagger/>
 - **Mailpit** (profil dev) : <http://localhost:8025>
 
+#### Raccourcis Make
+
+```bash
+make docker-dev       # stack + Mailpit (profil dev) — seede une config SMTP Mailpit par défaut
+make docker-dev-s3    # idem + SeaweedFS (pièces jointes sur S3)
+make docker-down      # arrêter
+make docker-logs      # suivre les logs
+```
+
+> `make docker-dev` est le plus simple pour un test local complet : il lance Mailpit
+> et seede automatiquement la config SMTP par défaut (mode `mailpit`), donc l'envoi
+> ci-dessous fonctionne sans configuration manuelle.
+
+#### Premier envoi de mail
+
+```bash
+# 1) Récupérer un token admin
+TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/token \
+  -H "Content-Type: application/json" -d '{"api_key":"admin-dev-key"}' | jq -r '.data.token')
+
+# 2) Envoyer un mail (visible ensuite sur http://localhost:8025)
+curl -s -X POST http://localhost:8080/api/v1/mails \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"to":[{"email":"dest@example.com","name":"Dest"}],"subject":"Hello MailHive","html_body":"<p>Bonjour !</p>"}' | jq
+```
+
+Plus d'exemples (CC/BCC, pièce jointe, envoi différé) dans la section [Utilisation](#utilisation).
+
 ### Développement local (sans Docker)
 
 ```bash
@@ -547,7 +578,9 @@ auto-hébergé par défaut). C'est un fichier autonome (ne pas combiner avec
 
 ```bash
 # Fournir les secrets via un .env (ou l'environnement) — voir .env.example
-MAILHIVE_TAG=0.1.0 docker compose -f docker-compose.prod.yml up -d
+# Image :latest par défaut ; épingler une version via MAILHIVE_TAG (voir Releases).
+docker compose -f docker-compose.prod.yml up -d
+# ou : MAILHIVE_TAG=0.1.3 docker compose -f docker-compose.prod.yml up -d
 # ou : make docker-prod
 ```
 
@@ -589,7 +622,7 @@ docker run -d -p 8080:8080 \
   -e REDIS_ADDR=redis.interne:6379 \
   -e JWT_SECRET=… -e ENCRYPTION_KEY=… -e ADMIN_API_KEY=… \
   -e BLOB_BACKEND=postgres \
-  ghcr.io/statoon54/mailhive:0.1.0
+  ghcr.io/statoon54/mailhive:latest
 ```
 
 Seuls **PostgreSQL et un serveur compatible Redis** sont indispensables ; un
@@ -751,6 +784,26 @@ curl -X POST http://localhost:8080/api/v1/mails \
   }'
 ```
 
+### Avec CC/BCC et pièce jointe
+
+Les pièces jointes sont fournies dans `attachments`, leur `content` encodé en **base64** :
+
+```bash
+curl -X POST http://localhost:8080/api/v1/mails \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to":  [{"email": "dest@example.com", "name": "Destinataire"}],
+    "cc":  [{"email": "copie@example.com"}],
+    "bcc": [{"email": "archive@example.com"}],
+    "subject": "Document ci-joint",
+    "html_body": "<p>Veuillez trouver le document en pièce jointe.</p>",
+    "attachments": [
+      {"filename": "doc.txt", "content_type": "text/plain", "content": "Qm9uam91ciA6KQ=="}
+    ]
+  }'
+```
+
 ### Planifier un envoi différé
 
 ```bash
@@ -761,9 +814,12 @@ curl -X POST http://localhost:8080/api/v1/mails \
     "to": [{"email": "dest@example.com", "name": "Destinataire"}],
     "template_id": "ID_DU_TEMPLATE",
     "template_data": {"name": "Marie", "activation_url": "https://example.com/activate"},
-    "scheduled_at": "2026-03-10 09:00:00"
+    "scheduled_at": "2026-03-10T09:00:00Z"
   }'
 ```
+
+> Privilégier le format RFC3339 **UTC** (`...Z`) : un datetime « nu » (`2026-03-10 09:00:00`)
+> est interprété dans le fuseau du serveur, pas celui de votre poste.
 
 Formats de date acceptés pour `scheduled_at` :
 
@@ -920,7 +976,7 @@ L'éditeur de templates intègre un assistant IA pour générer du contenu HTML 
 1. L'utilisateur décrit le contenu souhaité dans une modale
 2. `POST /api/v1/ai/generate` envoie le prompt au LLM configuré
 3. Le LLM génère uniquement le contenu HTML interne (pas de `<html>`, `<body>`)
-4. Le résultat est inséré dans l'éditeur TipTap, modifiable avant sauvegarde
+4. Le résultat est inséré dans l'éditeur, modifiable avant sauvegarde
 
 ---
 
