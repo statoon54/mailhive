@@ -11,6 +11,31 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Documentation
+
+- Démarrage rapide « Make » + exemples d'envoi enrichis (CC/BCC, pièce jointe,
+  envoi via template, envoi différé).
+- README anglais (`README.en.md`) mis à parité sur les exemples.
+- Diagramme du flux d'envoi remplacé par un flowchart (plus lisible sur GitHub).
+
+### Interne
+
+- Alignement mémoire de structs (fieldalignment) — sans impact fonctionnel.
+
+## [0.1.3] - 2026-06-16
+
+### Ajouté
+
+- Validation du **format des adresses `cc`/`bcc`** à la création d'un mail
+  (auparavant seul `to` était validé).
+
+## [0.1.2] - 2026-06-16
+
+### Corrigé
+
+- Outillage de release : le changelog GoReleaser exclut désormais aussi les
+  commits **scopés** (`docs(...)`, `chore(...)`, `test(...)`).
+
 ## [0.1.1] - 2026-06-16
 
 ### Corrigé
@@ -48,6 +73,8 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   + S3) ; schéma OpenAPI servi via Swagger UI.
 - Documentation bilingue FR/EN.
 
-[Non publié]: https://github.com/statoon54/mailhive/compare/v0.1.1...HEAD
+[Non publié]: https://github.com/statoon54/mailhive/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/statoon54/mailhive/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/statoon54/mailhive/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/statoon54/mailhive/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/statoon54/mailhive/releases/tag/v0.1.0
