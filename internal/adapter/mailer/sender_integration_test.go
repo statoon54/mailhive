@@ -5,7 +5,7 @@ package mailer_test
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
+	json "encoding/json/v2"
 	"fmt"
 	"net/http"
 	"os"
@@ -124,7 +124,7 @@ func waitForMessage(t *testing.T, subject string, timeout time.Duration) mailpit
 		require.NoError(t, err)
 
 		var result mailpitSearchResult
-		err = json.NewDecoder(resp.Body).Decode(&result)
+		err = json.UnmarshalRead(resp.Body, &result)
 		_ = resp.Body.Close()
 		require.NoError(t, err)
 
@@ -149,7 +149,7 @@ func getMessageDetail(t *testing.T, id string) mailpitMessageDetail {
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var detail mailpitMessageDetail
-	err = json.NewDecoder(resp.Body).Decode(&detail)
+	err = json.UnmarshalRead(resp.Body, &detail)
 	require.NoError(t, err)
 	return detail
 }

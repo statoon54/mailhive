@@ -2,7 +2,7 @@ package worker
 
 import (
 	"context"
-	"encoding/json"
+	json "encoding/json/v2"
 	"fmt"
 	"testing"
 	"time"
