@@ -34,6 +34,10 @@ archives:
 checksum:
   name_template: checksums.txt
 
+# L'en-tête des notes est produit par la CI depuis la section correspondante du
+# CHANGELOG (scripts/changelog-section.sh, passé en --release-header) : la liste
+# de sujets de commits ci-dessous ne suffit pas à signaler une rupture de
+# contrat, celle-ci se réduisant à un « ! » au milieu d'une ligne.
 changelog:
   use: github
   sort: asc
