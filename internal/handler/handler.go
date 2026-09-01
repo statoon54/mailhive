@@ -1,11 +1,13 @@
 package handler
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -33,38 +35,113 @@ func bindRequest(c *echo.Context, req any) error {
 		})
 	}
 
-	err := json.Unmarshal(body, req)
+	err := json.Unmarshal(body, req, decodeOptions)
 	if err == nil {
 		return nil
 	}
 
-	if syntaxErr, ok := errors.AsType[*json.SyntaxError](err); ok {
+	// Erreur de grammaire : le document n'est pas du JSON valide.
+	if syntaxErr, ok := errors.AsType[*jsontext.SyntacticError](err); ok {
 		return c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error: i18n.T(l, "err.invalid_json"),
 			Fields: []FieldValidationError{
-				{Field: "json", Message: jsonContextAt(l, body, syntaxErr.Offset)},
+				{Field: "json", Message: jsonContextAt(l, body, syntaxErr.ByteOffset)},
 			},
 		})
 	}
 
-	if typeErr, ok := errors.AsType[*json.UnmarshalTypeError](err); ok {
-		field := typeErr.Field
-		if field == "" {
-			field = i18n.T(l, "err.request_body")
-		}
-		expected := i18n.TypeName(l, typeErr.Type.Name())
-		received := i18n.TypeName(l, typeErr.Value)
+	// Erreur de sens : le JSON est valide mais ne correspond pas au type Go.
+	if semErr, ok := errors.AsType[*json.SemanticError](err); ok {
 		return c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: i18n.T(l, "err.invalid_json"),
-			Fields: []FieldValidationError{
-				{Field: toSnakeCase(field), Message: fmt.Sprintf(i18n.T(l, "err.expected_got"), expected, received)},
-			},
+			Error:  i18n.T(l, "err.invalid_json"),
+			Fields: []FieldValidationError{semanticFieldError(l, semErr)},
 		})
 	}
 
 	return c.JSON(http.StatusBadRequest, ErrorResponse{
 		Error: i18n.T(l, "err.invalid_json"),
 	})
+}
+
+// semanticFieldError traduit une erreur sémantique json/v2 en erreur de champ.
+//
+// La v2 ne fournit plus le nom du champ Go ni une étiquette de type prête à
+// l'emploi : le nom vient du JSON Pointer (« /to/0/email ») et les types se
+// lisent sur GoType et JSONKind.
+func semanticFieldError(l i18n.Lang, semErr *json.SemanticError) FieldValidationError {
+	field := pointerField(semErr.JSONPointer)
+	if field == "" {
+		field = i18n.T(l, "err.request_body")
+	}
+
+	expected := i18n.TypeName(l, goTypeLabel(semErr.GoType))
+	received := i18n.TypeName(l, jsonKindLabel(semErr.JSONKind))
+
+	return FieldValidationError{
+		Field:   field,
+		Message: fmt.Sprintf(i18n.T(l, "err.expected_got"), expected, received),
+	}
+}
+
+// pointerField extrait le nom du champ fautif d'un JSON Pointer RFC 6901.
+// Les indices de tableau sont ignorés : « /to/0/email » donne « email ».
+func pointerField(ptr jsontext.Pointer) string {
+	field := ""
+	for token := range ptr.Tokens() {
+		if _, err := strconv.Atoi(token); err == nil {
+			continue // indice de tableau, pas un nom de champ
+		}
+		field = token
+	}
+	return field
+}
+
+// goTypeLabel nomme un type Go pour l'affichage.
+//
+// reflect.Type.Name() est vide pour les types composites (slice, map, pointeur),
+// ce qui produisait auparavant des messages tronqués du genre « Attendu , reçu
+// chaîne de caractères ». On retombe sur la catégorie du type.
+func goTypeLabel(t reflect.Type) string {
+	if t == nil {
+		return ""
+	}
+	if name := t.Name(); name != "" {
+		return name
+	}
+	switch t.Kind() {
+	case reflect.Slice, reflect.Array:
+		return "slice"
+	case reflect.Map, reflect.Struct:
+		return "object"
+	case reflect.Pointer:
+		return goTypeLabel(t.Elem())
+	default:
+		return t.Kind().String()
+	}
+}
+
+// jsonKindLabel nomme la valeur JSON reçue, dans le vocabulaire déjà traduit
+// par i18n (« string », « number », « bool », « slice », « object »).
+func jsonKindLabel(k jsontext.Kind) string {
+	// Kind est le premier octet du symbole de la grammaire ('0' pour tous les
+	// nombres). Sa méthode String() renvoie « true »/« false » séparément et le
+	// symbole brut pour les tableaux et objets : on mappe donc l'octet.
+	switch k {
+	case '"':
+		return "string"
+	case '0':
+		return "number"
+	case 't', 'f':
+		return "bool"
+	case '[':
+		return "slice"
+	case '{':
+		return "object"
+	case 'n':
+		return "null"
+	default:
+		return ""
+	}
 }
 
 // jsonContextAt extrait un extrait du JSON autour de la position d'erreur.

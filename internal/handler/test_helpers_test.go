@@ -10,7 +10,7 @@ import (
 )
 
 func newTestContext(method, path string, body any) (*echo.Context, *httptest.ResponseRecorder) {
-	e := echo.New()
+	e := NewEcho()
 	var req *http.Request
 	if body != nil {
 		b, _ := json.Marshal(body)

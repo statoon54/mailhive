@@ -6,8 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/labstack/echo/v5"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -26,7 +24,7 @@ import (
 // helpers de test, on a besoin de JSON volontairement invalide.
 func bindRaw(t *testing.T, body, acceptLanguage string) (int, string, domain.CreateMailRequest) {
 	t.Helper()
-	e := echo.New()
+	e := NewEcho()
 	req := httptest.NewRequest(http.MethodPost, "/mails", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept-Language", acceptLanguage)
@@ -74,7 +72,7 @@ func TestBindContract_TypeError(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, code)
 		assert.JSONEq(t, `{
 			"error": "Format JSON invalide",
-			"fields": [{"field": "subject", "message": "Attendu chaîne de caractères, reçu number"}],
+			"fields": [{"field": "subject", "message": "Attendu chaîne de caractères, reçu nombre"}],
 			"success": false
 		}`, body)
 	})
@@ -90,32 +88,49 @@ func TestBindContract_TypeError(t *testing.T) {
 	})
 
 	t.Run("tableau attendu, chaîne reçue", func(t *testing.T) {
-		// Contrat actuel, volontairement figé tel quel : le type attendu est
-		// vide (« Attendu , reçu … ») parce que reflect.Type.Name() ne retourne
-		// rien pour un type slice. C'est un défaut préexistant, corrigé lors du
-		// passage à json/v2 — ce cas documente l'état d'avant.
+		// Corrigé par la migration : le message indiquait auparavant « Attendu ,
+		// reçu … », reflect.Type.Name() étant vide pour un type slice. Le
+		// libellé se déduit désormais de la catégorie du type.
 		code, body, _ := bindRaw(t, `{"to": "pas-un-tableau"}`, "fr")
 		assert.Equal(t, http.StatusBadRequest, code)
 		assert.Contains(t, body, `"field":"to"`)
-		assert.Contains(t, body, "Attendu , reçu chaîne de caractères")
+		assert.Contains(t, body, "Attendu tableau, reçu chaîne de caractères")
+	})
+
+	t.Run("champ imbriqué : le nom vient du JSON Pointer", func(t *testing.T) {
+		// « /to/0/email » : l'indice de tableau est ignoré, seul le nom du
+		// champ fautif est remonté.
+		code, body, _ := bindRaw(t, `{"to": [{"email": 123}]}`, "fr")
+		assert.Equal(t, http.StatusBadRequest, code)
+		assert.Contains(t, body, `"field":"email"`)
+		assert.Contains(t, body, "Attendu chaîne de caractères, reçu nombre")
 	})
 }
 
-// TestBindContract_Strictness fige les deux comportements permissifs de v1 que
-// json/v2 durcit : la tolérance à la casse et l'acceptation des clés dupliquées.
+// TestBindContract_Strictness fige les deux comportements permissifs de v1 face
+// au durcissement de json/v2 : l'un est conservé, l'autre volontairement adopté.
 func TestBindContract_Strictness(t *testing.T) {
-	t.Run("la casse des noms de champs est tolérée", func(t *testing.T) {
+	t.Run("la casse des noms de champs reste tolérée", func(t *testing.T) {
+		// Conservé via MatchCaseInsensitiveNames. json/v2 est sensible à la
+		// casse et ignore les membres inconnus : sans cette option, la requête
+		// serait acceptée avec le champ silencieusement perdu.
 		code, _, parsed := bindRaw(t, `{"SUBJECT": "Sujet"}`, "fr")
 		assert.Equal(t, http.StatusOK, code, "aucune réponse d'erreur écrite")
-		assert.Equal(t, "Sujet", parsed.Subject,
-			"v1 associe SUBJECT au champ subject ; json/v2 ne le fait qu'avec MatchCaseInsensitiveNames")
+		assert.Equal(t, "Sujet", parsed.Subject)
 	})
 
-	t.Run("une clé dupliquée est acceptée, la dernière gagne", func(t *testing.T) {
-		code, _, parsed := bindRaw(t, `{"subject":"a","subject":"b"}`, "fr")
-		assert.Equal(t, http.StatusOK, code, "aucune réponse d'erreur écrite")
-		assert.Equal(t, "b", parsed.Subject,
-			"v1 retient la dernière occurrence ; json/v2 rejette le document")
+	t.Run("une clé dupliquée est désormais rejetée", func(t *testing.T) {
+		// Durcissement assumé : v1 retenait silencieusement la dernière
+		// occurrence, ce qui masquait des requêtes ambiguës côté client.
+		//
+		// À noter : le décodage s'arrête sur la clé dupliquée, après avoir déjà
+		// écrit les membres précédents dans la struct (subject vaut ici « a »).
+		// La garantie porte sur le rejet, pas sur une struct intacte — les
+		// appelants ne doivent pas lire req quand bindRequest a écrit une
+		// réponse, ce que la signature impose déjà.
+		code, body, _ := bindRaw(t, `{"subject":"a","subject":"b"}`, "fr")
+		assert.Equal(t, http.StatusBadRequest, code)
+		assert.Contains(t, body, "Format JSON invalide")
 	})
 }
 
