@@ -1,4 +1,4 @@
-.PHONY: build build-frontend run run-api run-worker test test-unit test-integration test-smtp test-all lint migrate-up migrate-down docker-up docker-down docker-dev docker-dev-down docker-dev-s3 docker-prod docker-prod-down docker-prod-logs docker-test-up docker-test-down tidy
+.PHONY: build build-frontend run run-api run-worker test test-unit test-integration test-smtp test-all lint modernize modernize-check migrate-up migrate-down docker-up docker-down docker-dev docker-dev-down docker-dev-s3 docker-prod docker-prod-down docker-prod-logs docker-test-up docker-test-down tidy
 
 # Variables
 BINARY=bin/mailhive
@@ -49,6 +49,15 @@ test-all:
 # Lint
 lint:
 	golangci-lint run ./...
+
+# Modernisation : applique les correcteurs d'idiomes du toolchain Go.
+# ./... est évité — il embarquerait le Go vendored sous frontend/node_modules.
+modernize:
+	go fix ./cmd/... ./internal/... ./api/...
+
+# Même vérification, sans rien modifier : échoue si un correcteur reste à appliquer.
+modernize-check:
+	go fix -diff ./cmd/... ./internal/... ./api/...
 
 # Migrations
 migrate-up:
