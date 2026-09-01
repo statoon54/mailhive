@@ -20,3 +20,6 @@ frontend/dist/
 send_2000_mails.sh
 send_2000_mails_individuel.sh
 
+
+# Sortie de GoReleaser (build local : goreleaser release --skip=publish)
+/dist/
