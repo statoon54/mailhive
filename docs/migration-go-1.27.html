@@ -1,0 +1,917 @@
+<title>Migration Go 1.27</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+  :root {
+    --ground: #F4F5F7;
+    --surface: #FFFFFF;
+    --surface-2: #EAECF0;
+    --ink: #191C22;
+    --muted: #5C6472;
+    --hairline: #D6DAE1;
+    --accent: #B87309;
+    --accent-soft: #F6EBD8;
+    --teal: #0E6B6B;
+    --danger: #A62F26;
+    --danger-soft: #F7E3E1;
+    --ok: #2C6E4B;
+    --ok-soft: #DFEEE5;
+    --warn: #8A5A00;
+    --warn-soft: #F8EDD5;
+
+    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #131519;
+      --surface: #1B1E24;
+      --surface-2: #23272F;
+      --ink: #E2E5EA;
+      --muted: #8A93A3;
+      --hairline: #2E333C;
+      --accent: #E5A544;
+      --accent-soft: #33270F;
+      --teal: #45A79E;
+      --danger: #E8837A;
+      --danger-soft: #38211F;
+      --ok: #6BBF90;
+      --ok-soft: #1B2E24;
+      --warn: #D8A23F;
+      --warn-soft: #33280F;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #131519;
+    --surface: #1B1E24;
+    --surface-2: #23272F;
+    --ink: #E2E5EA;
+    --muted: #8A93A3;
+    --hairline: #2E333C;
+    --accent: #E5A544;
+    --accent-soft: #33270F;
+    --teal: #45A79E;
+    --danger: #E8837A;
+    --danger-soft: #38211F;
+    --ok: #6BBF90;
+    --ok-soft: #1B2E24;
+    --warn: #D8A23F;
+    --warn-soft: #33280F;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 24px 96px;
+  }
+
+  /* ---------- Masthead ---------- */
+
+  .masthead {
+    padding: 64px 0 40px;
+    border-bottom: 2px solid var(--ink);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(38px, 6.5vw, 66px);
+    line-height: 1.02;
+    letter-spacing: -0.028em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    font-size: 20px;
+    line-height: 1.5;
+    color: var(--muted);
+    max-width: 60ch;
+    margin: 0;
+  }
+
+  .provenance {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+  }
+
+  .provenance span {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 2px;
+    padding: 5px 9px;
+    color: var(--muted);
+  }
+
+  .provenance span b {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* ---------- Sections ---------- */
+
+  section { padding-top: 64px; }
+
+  h2 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 24px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  h3 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 23px;
+    letter-spacing: -0.012em;
+    line-height: 1.25;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p:last-child { margin-bottom: 0; }
+
+  a { color: var(--accent); text-underline-offset: 2px; }
+  a:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--surface-2);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+
+  /* ---------- Stat strip ---------- */
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--hairline);
+    border: 1px solid var(--hairline);
+  }
+
+  .stat {
+    background: var(--surface);
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .stat .num {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 30px;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  .stat .lbl {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+
+  /* ---------- Evidence blocks ---------- */
+
+  .evidence {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-left: 3px solid var(--accent);
+    padding: 18px 20px;
+    margin: 0 0 20px;
+    overflow-x: auto;
+  }
+
+  .evidence .cap {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.7;
+    margin: 0;
+    white-space: pre;
+  }
+
+  .v1 { color: var(--muted); }
+  .v2 { color: var(--ink); font-weight: 500; }
+  .add { color: var(--ok); }
+  .del { color: var(--danger); }
+  .cmt { color: var(--muted); font-style: italic; }
+
+  /* ---------- Change list ---------- */
+
+  .changes {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--hairline);
+    border: 1px solid var(--hairline);
+  }
+
+  .change {
+    background: var(--surface);
+    padding: 22px 24px;
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 0 18px;
+  }
+
+  .change .mark {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+
+  .change h4 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 18px;
+    margin: 0 0 8px;
+    letter-spacing: -0.008em;
+  }
+
+  .change .body { grid-column: 2; }
+  .change .body p { font-size: 16px; }
+
+  /* ---------- Stages ---------- */
+
+  .stages {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .stage {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .stage-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 20px 24px 0;
+  }
+
+  .stage-num {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    color: var(--surface);
+    background: var(--ink);
+    padding: 4px 8px;
+    border-radius: 2px;
+    flex: none;
+  }
+
+  .stage-body { padding: 14px 24px 24px; }
+  .stage-body p { font-size: 16px; }
+
+  .chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-left: auto;
+  }
+
+  .chip {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  .chip.risk-low  { background: var(--ok-soft);     color: var(--ok); }
+  .chip.risk-mid  { background: var(--warn-soft);   color: var(--warn); }
+  .chip.risk-high { background: var(--danger-soft); color: var(--danger); }
+  .chip.neutral   { background: var(--surface-2);   color: var(--muted); }
+
+  ul.tight {
+    margin: 0 0 16px;
+    padding-left: 20px;
+    max-width: 68ch;
+    font-size: 16px;
+  }
+  ul.tight:last-child { margin-bottom: 0; }
+  ul.tight li { margin-bottom: 7px; }
+  ul.tight li::marker { color: var(--accent); }
+
+  /* ---------- Tables ---------- */
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--hairline); background: var(--surface); }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 560px;
+    font-size: 14.5px;
+  }
+
+  th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    text-align: left;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--hairline);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--hairline);
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  td.mono, th.mono { font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  td .from { color: var(--muted); }
+  td .arrow { color: var(--accent); padding: 0 4px; }
+  td .to { color: var(--ink); font-weight: 500; }
+
+  /* ---------- Callout ---------- */
+
+  .callout {
+    background: var(--danger-soft);
+    border-left: 3px solid var(--danger);
+    padding: 18px 22px;
+    margin: 0 0 20px;
+  }
+
+  .callout .cap {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--danger);
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+
+  .callout p { font-size: 16px; }
+
+  /* ---------- Checklist ---------- */
+
+  .checklist {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1px;
+    background: var(--hairline);
+    border: 1px solid var(--hairline);
+  }
+
+  .check {
+    background: var(--surface);
+    padding: 16px 18px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .check .box {
+    width: 15px; height: 15px;
+    border: 1.5px solid var(--muted);
+    border-radius: 2px;
+    flex: none;
+    margin-top: 4px;
+  }
+
+  .check .txt { font-size: 15px; line-height: 1.45; }
+  .check .txt code { font-size: 0.85em; }
+
+  footer {
+    margin-top: 80px;
+    padding-top: 24px;
+    border-top: 1px solid var(--hairline);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+
+  @media (max-width: 620px) {
+    body { font-size: 16px; }
+    .change { grid-template-columns: 1fr; gap: 8px; }
+    .change .body { grid-column: 1; }
+    .chips { margin-left: 0; width: 100%; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <div class="eyebrow">MailHive · Plan de migration</div>
+    <h1>Migration Go 1.27</h1>
+    <p class="standfirst">
+      Passage du toolchain à 1.27, adoption complète de <code>encoding/json/v2</code>,
+      modernisation du code et remise à niveau de la CI — en sept étapes commitables
+      indépendamment.
+    </p>
+    <div class="provenance">
+      <span>Vérifié sur <b>go1.27.0 darwin/arm64</b></span>
+      <span>Base <b>go 1.25.0</b> · 19 077 LOC</span>
+      <span>Build &amp; vet <b>verts</b> avant migration</span>
+      <span>Décisions : <b>json/v2 complet</b> · <b>google/uuid conservé</b></span>
+    </div>
+  </header>
+
+  <section>
+    <h2>Périmètre mesuré</h2>
+    <div class="stats">
+      <div class="stat"><div class="num">315</div><div class="lbl">tags json</div></div>
+      <div class="stat"><div class="num">92</div><div class="lbl">omitempty</div></div>
+      <div class="stat"><div class="num">2</div><div class="lbl">tags cassants</div></div>
+      <div class="stat"><div class="num">13</div><div class="lbl">fichiers json (hors tests)</div></div>
+      <div class="stat"><div class="num">144</div><div class="lbl">lignes de <code>go fix</code></div></div>
+      <div class="stat"><div class="num">9</div><div class="lbl">actions CI en retard</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Ce qui change réellement</h2>
+
+    <p>
+      Trois divergences sémantiques entre <code>encoding/json</code> et
+      <code>encoding/json/v2</code> touchent ce dépôt. Elles ont été mesurées, pas
+      supposées : voici la sortie réelle des deux moteurs sur la même structure.
+    </p>
+
+    <div class="evidence">
+      <div class="cap">Sortie observée · même struct, deux moteurs</div>
+<pre><span class="v1">v1: {"sl":null,"m":null,"str":"x","html":"<b>&</b>"}</span>
+<span class="v2">v2: {"sl":[],  "m":{},  "str":"x","html":"&lt;b&gt;&amp;&lt;/b&gt;","n":0}</span>
+                <span class="cmt">↑ tableau vide  ↑ objet vide      ↑ plus d'échappement HTML   ↑ omitempty ignoré</span></pre>
+    </div>
+
+    <div class="changes">
+
+      <div class="change">
+        <div class="mark">A</div>
+        <div class="body">
+          <h4><code>omitempty</code> n'omet plus les zéros numériques, booléens ni temporels</h4>
+          <p>
+            En v2, <code>omitempty</code> signifie « omettre si l'encodage JSON est vide » :
+            <code>0</code> et <code>false</code> ne le sont pas. Les pointeurs, chaînes,
+            slices et maps gardent le comportement attendu — ce qui limite l'impact à
+            <b>deux champs</b> dans tout le domaine.
+          </p>
+          <div class="evidence" style="margin-top:4px">
+            <div class="cap">Les seuls champs non-pointeurs concernés</div>
+<pre><span class="del">- internal/domain/analysis.go:55  StatusCode int  `json:"status_code,omitempty"`</span>
+<span class="add">+ internal/domain/analysis.go:55  StatusCode int  `json:"status_code,omitzero"`</span>
+
+<span class="del">- internal/domain/mail.go:181     Individuel bool `json:"individuel,omitempty"`</span>
+<span class="add">+ internal/domain/mail.go:181     Individuel bool `json:"individuel,omitzero"`</span></pre>
+          </div>
+          <p>
+            <code>Data any</code> (<code>handler.go:86</code>) et <code>Language i18n.Lang</code>
+            (<code>tenant.go:20</code>, type <code>string</code>) restent corrects tels quels.
+          </p>
+        </div>
+      </div>
+
+      <div class="change">
+        <div class="mark">B</div>
+        <div class="body">
+          <h4>Les slices et maps nulles sérialisent en <code>[]</code> et <code>{}</code></h4>
+          <p>
+            Changement visible par le frontend React. Il concerne les champs
+            <i>sans</i> <code>omitempty</code> : <code>Rules</code>, <code>Issues</code>,
+            <code>Clients</code>, <code>Links</code> (<code>analysis.go</code>),
+            <code>Variables</code> et <code>Data</code> (<code>template.go</code>),
+            <code>Items</code> (<code>mail.go:224</code>).
+          </p>
+          <p>
+            C'est une amélioration du contrat d'API — plus de <code>null</code> à garder
+            côté React — mais elle doit être assumée explicitement, pas subie.
+            <code>json.FormatNilSliceAsNull(true)</code> permet de conserver l'ancien
+            comportement si la rupture n'est pas souhaitée maintenant.
+          </p>
+        </div>
+      </div>
+
+      <div class="change">
+        <div class="mark">C</div>
+        <div class="body">
+          <h4>Le décodage devient sensible à la casse et refuse les clés dupliquées</h4>
+          <p>
+            <code>{"STR":"hi"}</code> ne remplit plus le champ <code>str</code> — et
+            n'échoue pas non plus : le membre est simplement ignoré, donc silencieusement
+            perdu. Un client qui envoie <code>Template_ID</code> au lieu de
+            <code>template_id</code> verra ses requêtes acceptées mais amputées.
+          </p>
+          <p>
+            Les clés dupliquées, elles, deviennent une erreur dure :
+            <code>jsontext: duplicate object member name "str"</code>.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Deux intégrations à recâbler</h2>
+
+    <div class="callout">
+      <div class="cap">Point non évident nº 1 — Echo ne passe pas par vos imports</div>
+      <p>
+        Tous les <code>c.JSON(...)</code> traversent <code>echo.DefaultJSONSerializer</code>,
+        qui est câblé sur <code>encoding/json</code> v1. Aucun sérialiseur personnalisé
+        n'est enregistré aujourd'hui. Changer les imports dans <code>internal/handler/</code>
+        <b>ne changera donc rien aux réponses HTTP</b> : il faut implémenter
+        <code>echo.JSONSerializer</code> et l'installer sur l'instance créée en
+        <code>cmd/mailhive/main.go:318</code>.
+      </p>
+    </div>
+
+    <div class="callout">
+      <div class="cap">Point non évident nº 2 — les types d'erreur JSON changent</div>
+      <p>
+        <code>bindRequest</code> (<code>internal/handler/handler.go:25-70</code>) traduit les
+        erreurs JSON en messages i18n en s'appuyant sur <code>*json.SyntaxError</code> et
+        <code>*json.UnmarshalTypeError</code>. Ces types ne sont plus retournés par v2 ; le
+        mapping i18n doit être réécrit, sinon toutes les erreurs de body retombent
+        silencieusement sur le message générique <code>err.invalid_json</code>.
+      </p>
+    </div>
+
+    <div class="evidence">
+      <div class="cap">Correspondance vérifiée des types d'erreur</div>
+<pre><span class="v1">v1  *json.SyntaxError</span>        .Offset
+<span class="v2">v2  *jsontext.SyntacticError</span> .ByteOffset  .JSONPointer  .Err
+    <span class="cmt">jsontext: invalid character 'b' at start of value after offset 1</span>
+
+<span class="v1">v1  *json.UnmarshalTypeError</span> .Field  .Type  .Value
+<span class="v2">v2  *json.SemanticError</span>      .JSONPointer  .GoType  .JSONKind  .ByteOffset
+    <span class="cmt">json: cannot unmarshal JSON string into Go int within "/n"</span></pre>
+    </div>
+
+    <p>
+      Le nom de champ pour <code>FieldValidationError</code> se dérive désormais du
+      <code>JSONPointer</code> (<code>"/n"</code>) plutôt que de <code>.Field</code>, et
+      <code>i18n.TypeName</code> se nourrit de <code>GoType.Name()</code> côté attendu,
+      <code>JSONKind.String()</code> côté reçu. <code>toSnakeCase</code> devient inutile
+      sur ce chemin : le pointeur porte déjà le nom JSON.
+    </p>
+  </section>
+
+  <section>
+    <h2>Ce qui ne bouge pas</h2>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Point de contact</th><th>Verdict</th><th class="mono">Vérification</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>google/uuid</code> sous json/v2</td>
+            <td>Compatible — <code>MarshalText</code> honoré</td>
+            <td class="mono">aller-retour OK</td>
+          </tr>
+          <tr>
+            <td><code>FlexTime</code> (marshaleurs v1 maison)</td>
+            <td>Compatible — v2 honore <code>MarshalJSON</code>/<code>UnmarshalJSON</code></td>
+            <td class="mono">aucun changement</td>
+          </tr>
+          <tr>
+            <td>pgx v5 ↔ colonnes <code>uuid</code></td>
+            <td>Inchangé (décision : on garde <code>google/uuid</code>)</td>
+            <td class="mono">—</td>
+          </tr>
+          <tr>
+            <td><code>validator/v10</code></td>
+            <td>Lit les tags <code>validate:</code>, indépendant du moteur JSON</td>
+            <td class="mono">aucun impact</td>
+          </tr>
+          <tr>
+            <td>Build &amp; <code>go vet</code> sous 1.27</td>
+            <td>Verts sans aucune modification</td>
+            <td class="mono">baseline établie</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Les sept étapes</h2>
+
+    <div class="stages">
+
+      <article class="stage">
+        <div class="stage-head">
+          <span class="stage-num">00</span>
+          <h3>Filet de sécurité avant tout changement</h3>
+          <div class="chips"><span class="chip neutral">aucun risque</span></div>
+        </div>
+        <div class="stage-body">
+          <p>
+            Cette étape est la condition de toutes les autres : capturer le contrat d'API
+            <i>actuel</i> pendant qu'il tourne encore sur v1.
+          </p>
+          <ul class="tight">
+            <li>Tests <i>golden</i> figeant la sortie JSON de chaque struct de réponse
+                (<code>MailResponse</code>, <code>TemplateResponse</code>, <code>SpamResult</code>,
+                <code>HTMLCompatResult</code>, <code>LinkCheckResult</code>, <code>Paginated[T]</code>…),
+                y compris les cas <b>slice nulle</b> et <b>map nulle</b>.</li>
+            <li>Tests figeant les corps d'erreur de <code>bindRequest</code> (JSON malformé,
+                mauvais type) dans les deux langues.</li>
+            <li><code>make test-all</code> vert enregistré comme référence.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="stage">
+        <div class="stage-head">
+          <span class="stage-num">01</span>
+          <h3>Toolchain 1.27 et cohérence des versions</h3>
+          <div class="chips"><span class="chip risk-low">risque faible</span><span class="chip neutral">aucun changement de comportement</span></div>
+        </div>
+        <div class="stage-body">
+          <p>
+            Le dépôt est déjà incohérent aujourd'hui : <code>go.mod</code> déclare 1.25.0
+            alors que le <code>Dockerfile</code> compile sur <code>golang:1.26-alpine</code>.
+            Cette étape aligne tout.
+          </p>
+          <ul class="tight">
+            <li><code>go.mod</code> : <code>go 1.25.0</code> → <code>go 1.27.0</code>, plus une
+                directive <code>toolchain go1.27.0</code>.</li>
+            <li><code>Dockerfile:18</code> : <code>golang:1.26-alpine</code> → <code>golang:1.27-alpine</code>.</li>
+            <li>La CI et GoReleaser utilisent déjà <code>go-version-file: go.mod</code> — rien à toucher.</li>
+            <li>Vérifier : <code>go build ./...</code>, <code>go vet ./...</code>, <code>make test-all</code>.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="stage">
+        <div class="stage-head">
+          <span class="stage-num">02</span>
+          <h3>Modernisation mécanique via <code>go fix</code></h3>
+          <div class="chips"><span class="chip risk-low">risque faible</span><span class="chip neutral">144 lignes · 10 fichiers</span></div>
+        </div>
+        <div class="stage-body">
+          <p>
+            Une fois la version de langage à 1.27, les correcteurs du toolchain s'activent.
+            Le diff a été mesuré à l'avance et reste entièrement mécanique.
+          </p>
+          <div class="evidence" style="margin-top:4px">
+            <div class="cap">Extraits réels du diff mesuré</div>
+<pre><span class="cmt">// internal/worker/mail_handler.go:246 — errors.AsType</span>
+<span class="del">- var permErr *domain.SMTPPermanentError</span>
+<span class="del">- if errors.As(err, &amp;permErr) {</span>
+<span class="add">+ if _, ok := errors.AsType[*domain.SMTPPermanentError](err); ok {</span>
+
+<span class="cmt">// internal/worker/circuit_breaker_test.go:139 — WaitGroup.Go</span>
+<span class="del">- wg.Add(1)</span>
+<span class="del">- go func() { defer wg.Done(); … }()</span>
+<span class="add">+ wg.Go(func() { … })</span>
+
+<span class="cmt">// internal/middleware/tenant_context_test.go:27 — littéraux de champs promus</span>
+<span class="del">- RegisteredClaims: jwt.RegisteredClaims{ExpiresAt: …, IssuedAt: …},</span>
+<span class="add">+ ExpiresAt: …,  IssuedAt: …,</span></pre>
+          </div>
+          <ul class="tight">
+            <li>Lancer <code>go fix ./cmd/... ./internal/... ./api/...</code> — <b>jamais</b>
+                <code>./...</code>, qui embarque <code>frontend/node_modules/flatted</code>.</li>
+            <li>Fichiers touchés : <code>blobstore/s3_store.go</code>, <code>handler/handler.go</code>,
+                <code>service/auth_service.go</code>, <code>worker/mail_handler.go</code> et six fichiers de test.</li>
+            <li>Ajouter <code>modernize</code> aux linters de <code>.golangci.yml</code> pour que la
+                régression soit détectée automatiquement ensuite.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="stage">
+        <div class="stage-head">
+          <span class="stage-num">03</span>
+          <h3>json/v2 sur la couche interne</h3>
+          <div class="chips"><span class="chip risk-mid">risque moyen</span><span class="chip neutral">données persistées</span></div>
+        </div>
+        <div class="stage-body">
+          <p>
+            D'abord les encodages qui ne sortent pas de l'application : payloads Asynq,
+            colonnes JSONB, corps compressés, journal d'audit.
+          </p>
+          <ul class="tight">
+            <li><code>internal/compress/body.go</code> — <code>omitempty</code> sur deux
+                <code>string</code>, sémantique inchangée.</li>
+            <li><code>internal/worker/{tasks,server,mail_handler}.go</code> — payloads Asynq.</li>
+            <li><code>internal/adapter/postgres/{mail,template,tenant}_repo.go</code> — colonnes JSONB.</li>
+            <li><code>internal/service/llm_service.go</code>, <code>internal/middleware/audit.go</code>.</li>
+          </ul>
+          <div class="callout" style="margin-top:4px">
+            <div class="cap">Ordre de déploiement</div>
+            <p>
+              Les tâches Asynq déjà en file ont été encodées par v1. Le décodage v2 reste
+              compatible <i>tant que</i> la casse des tags correspond exactement — c'est le cas
+              ici, mais la marge est nulle. Purger la file avant bascule, ou déployer le worker
+              après l'API, plutôt que de compter dessus.
+            </p>
+          </div>
+        </div>
+      </article>
+
+      <article class="stage">
+        <div class="stage-head">
+          <span class="stage-num">04</span>
+          <h3>json/v2 sur la couche HTTP</h3>
+          <div class="chips"><span class="chip risk-high">risque élevé</span><span class="chip neutral">contrat d'API</span></div>
+        </div>
+        <div class="stage-body">
+          <p>Le cœur de la migration, et la seule étape où le contrat public bouge.</p>
+          <ul class="tight">
+            <li>Implémenter <code>echo.JSONSerializer</code> (<code>Serialize</code> /
+                <code>Deserialize</code>) sur <code>encoding/json/v2</code> et l'installer sur
+                <code>e := echo.New()</code> — <code>cmd/mailhive/main.go:318</code>.
+                <code>jsontext.WithIndent</code> couvre le paramètre <code>indent</code> de l'interface.</li>
+            <li>Réécrire le mapping d'erreurs de <code>bindRequest</code> sur
+                <code>*jsontext.SyntacticError</code> et <code>*json.SemanticError</code>
+                (voir la table de correspondance plus haut).</li>
+            <li>Adapter <code>jsonContextAt</code> : <code>.Offset</code> → <code>.ByteOffset</code>.</li>
+            <li>Décider explicitement du sort de <code>MatchCaseInsensitiveNames</code> :
+                l'activer pendant une version de transition préserve le comportement v1 pour les
+                clients existants, et permet de retirer la tolérance plus tard, une fois annoncée.</li>
+            <li>Les tests golden de l'étape 00 doivent maintenant échouer <b>exactement</b> là où
+                le changement est voulu — chaque écart non anticipé est un bug.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="stage">
+        <div class="stage-head">
+          <span class="stage-num">05</span>
+          <h3>Audit des tags : <code>omitempty</code> → <code>omitzero</code></h3>
+          <div class="chips"><span class="chip risk-mid">risque moyen</span><span class="chip neutral">92 tags à passer en revue</span></div>
+        </div>
+        <div class="stage-body">
+          <ul class="tight">
+            <li>Corriger les deux champs cassants (<code>StatusCode</code>, <code>Individuel</code>).</li>
+            <li>Passer les champs pointeurs (<code>*bool</code>, <code>*int</code>, <code>*float32</code>,
+                <code>*time.Time</code>, <code>*uuid.UUID</code>) en <code>omitzero</code> : le résultat est
+                identique mais l'intention devient lisible.</li>
+            <li>Conserver <code>omitempty</code> sur les chaînes, slices et maps — c'est là que sa
+                sémantique « vide » reste la bonne.</li>
+            <li>Côté React : les tableaux arrivent désormais en <code>[]</code>. Les gardes
+                <code>?? []</code> deviennent superflues ; les retirer est optionnel, le typage
+                TypeScript peut en revanche être resserré.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="stage">
+        <div class="stage-head">
+          <span class="stage-num">06</span>
+          <h3>Remise à niveau de la CI</h3>
+          <div class="chips"><span class="chip risk-low">risque faible</span><span class="chip neutral">indépendant des étapes 00-05</span></div>
+        </div>
+        <div class="stage-body">
+          <p>
+            Neuf actions ont pris une à trois majeures de retard. L'installation de
+            golangci-lint par <code>curl | sh</code> gagne aussi à devenir une action pinnée
+            avec cache.
+          </p>
+          <div class="tablewrap" style="margin-bottom:16px">
+            <table>
+              <thead>
+                <tr><th>Action</th><th class="mono">Version</th><th>Fichier</th></tr>
+              </thead>
+              <tbody>
+                <tr><td class="mono">actions/checkout</td><td class="mono"><span class="from">v4</span><span class="arrow">→</span><span class="to">v7</span></td><td>ci · release</td></tr>
+                <tr><td class="mono">actions/setup-go</td><td class="mono"><span class="from">v5</span><span class="arrow">→</span><span class="to">v7</span></td><td>ci · release</td></tr>
+                <tr><td class="mono">actions/setup-node</td><td class="mono"><span class="from">v4</span><span class="arrow">→</span><span class="to">v7</span></td><td>ci · release</td></tr>
+                <tr><td class="mono">goreleaser/goreleaser-action</td><td class="mono"><span class="from">v6</span><span class="arrow">→</span><span class="to">v7</span></td><td>release</td></tr>
+                <tr><td class="mono">docker/build-push-action</td><td class="mono"><span class="from">v6</span><span class="arrow">→</span><span class="to">v7</span></td><td>release</td></tr>
+                <tr><td class="mono">docker/metadata-action</td><td class="mono"><span class="from">v5</span><span class="arrow">→</span><span class="to">v6</span></td><td>release</td></tr>
+                <tr><td class="mono">docker/login-action</td><td class="mono"><span class="from">v3</span><span class="arrow">→</span><span class="to">v4</span></td><td>release</td></tr>
+                <tr><td class="mono">docker/setup-buildx-action</td><td class="mono"><span class="from">v3</span><span class="arrow">→</span><span class="to">v4</span></td><td>release</td></tr>
+                <tr><td class="mono">docker/setup-qemu-action</td><td class="mono"><span class="from">v3</span><span class="arrow">→</span><span class="to">v4</span></td><td>release</td></tr>
+                <tr><td class="mono">golangci-lint</td><td class="mono"><span class="from">v2.12.2</span><span class="arrow">→</span><span class="to">v2.13.2</span></td><td>ci (via action v9.3.0)</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <ul class="tight">
+            <li>Remplacer le bloc <code>curl | sh</code> par
+                <code>golangci/golangci-lint-action@v9.3.0</code> (cache intégré, version pinnée).</li>
+            <li>Ajouter <code>modernize</code> à <code>.golangci.yml</code>, en cohérence avec l'étape 02.</li>
+            <li>Nouveau garde-fou : <code>go fix -diff ./cmd/... ./internal/... ./api/...</code> en
+                échec si le diff n'est pas vide — le code ne peut plus régresser vers d'anciens idiomes.</li>
+            <li>Ajouter <code>govulncheck</code> sur le module.</li>
+            <li>Ajouter <code>.github/dependabot.yml</code> pour <code>gomod</code>,
+                <code>npm</code> (frontend) et <code>github-actions</code> — c'est l'absence de ce
+                fichier qui explique les neuf retards ci-dessus.</li>
+            <li>Faire tourner les tests d'intégration (<code>make test-integration</code>,
+                testcontainers) en CI : ils existent mais ne sont jamais exécutés, alors que ce sont
+                eux qui couvrent les repos Postgres impactés par l'étape 03.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="stage">
+        <div class="stage-head">
+          <span class="stage-num">07</span>
+          <h3>Documentation et journal des changements</h3>
+          <div class="chips"><span class="chip risk-low">risque faible</span></div>
+        </div>
+        <div class="stage-body">
+          <ul class="tight">
+            <li><code>CHANGELOG.md</code>, section <i>Non publié</i> : signaler la rupture du contrat
+                d'API (tableaux <code>[]</code> au lieu de <code>null</code>, sensibilité à la casse)
+                sous <b>Modifié</b>, pas sous <b>Interne</b>.</li>
+            <li><code>README.md</code> et <code>README.en.md</code> : prérequis Go 1.27.</li>
+            <li><code>CONTRIBUTING.md</code> : mentionner <code>go fix</code> dans la boucle de
+                développement locale.</li>
+          </ul>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Définition du terminé</h2>
+    <div class="checklist">
+      <div class="check"><div class="box"></div><div class="txt"><code>go build ./...</code> et <code>go vet ./...</code> verts sous 1.27</div></div>
+      <div class="check"><div class="box"></div><div class="txt"><code>make test-all</code> vert, tests d'intégration inclus</div></div>
+      <div class="check"><div class="box"></div><div class="txt"><code>go fix -diff</code> retourne un diff vide</div></div>
+      <div class="check"><div class="box"></div><div class="txt">golangci-lint v2.13.2 vert, <code>modernize</code> activé</div></div>
+      <div class="check"><div class="box"></div><div class="txt">Tests golden : chaque écart de sortie est intentionnel et documenté</div></div>
+      <div class="check"><div class="box"></div><div class="txt">Aucun import <code>encoding/json</code> v1 résiduel hors compatibilité assumée</div></div>
+      <div class="check"><div class="box"></div><div class="txt">Sérialiseur Echo v2 installé et couvert par un test</div></div>
+      <div class="check"><div class="box"></div><div class="txt">Erreurs de <code>bindRequest</code> toujours traduites en FR et EN</div></div>
+      <div class="check"><div class="box"></div><div class="txt">Frontend build + <code>tsc -b</code> verts contre la nouvelle forme JSON</div></div>
+      <div class="check"><div class="box"></div><div class="txt">Image Docker multi-arch construite sur <code>golang:1.27-alpine</code></div></div>
+    </div>
+  </section>
+
+  <footer>
+    Plan établi le 1<sup>er</sup> septembre 2026 · MailHive · branche <code>main</code> propre au moment de l'analyse.<br>
+    Toutes les affirmations sur Go 1.27 ont été vérifiées par exécution locale sur go1.27.0 darwin/arm64,
+    et non déduites de la documentation.
+  </footer>
+
+</div>
