@@ -502,7 +502,7 @@ auto-hébergé par défaut). C'est un fichier autonome (ne pas combiner avec
 # Fournir les secrets via un .env (ou l'environnement) — voir .env.example
 # Image :latest par défaut ; épingler une version via MAILHIVE_TAG (voir Releases).
 docker compose -f docker-compose.prod.yml up -d
-# ou : MAILHIVE_TAG=0.1.3 docker compose -f docker-compose.prod.yml up -d
+# ou : MAILHIVE_TAG=0.2.0 docker compose -f docker-compose.prod.yml up -d
 # ou : make docker-prod
 ```
 
