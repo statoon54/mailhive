@@ -1,7 +1,7 @@
 package compress
 
 import (
-	"encoding/json"
+	json "encoding/json/v2"
 	"fmt"
 
 	"github.com/klauspost/compress/zstd"
