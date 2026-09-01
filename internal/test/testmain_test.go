@@ -50,8 +50,10 @@ func TestMain(m *testing.M) {
 	}
 
 	dbCfg := config.DBConfig{
-		Host:     host,
-		Port:     port.Int(),
+		Host: host,
+		// testcontainers 0.44 retourne un moby network.Port, qui expose Num()
+		// (uint16) là où l'ancien nat.Port exposait Int().
+		Port:     int(port.Num()),
 		User:     "test",
 		Password: "test",
 		Name:     "mailhive_test",
