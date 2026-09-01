@@ -26,8 +26,8 @@ type AuditLog struct {
 // AuditLogFilter contient les critères de filtrage pour le journal d'audit.
 type AuditLogFilter struct {
 	TenantID     *uuid.UUID `json:"-"`
-	Status       *string    `json:"status,omitempty"`
-	ResourceType *string    `json:"resource_type,omitempty"`
+	Status       *string    `json:"status,omitzero"`
+	ResourceType *string    `json:"resource_type,omitzero"`
 	Page         int        `json:"page"`
 	Limit        int        `json:"limit"`
 }

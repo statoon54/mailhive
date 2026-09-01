@@ -122,11 +122,9 @@ func (s *AuthService) createToken(tenantID, tenantSlug, role string) (string, er
 		TenantID:   tenantID,
 		TenantSlug: tenantSlug,
 		Role:       role,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.cfg.Expiration)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "mailhive",
-		},
+		ExpiresAt:  jwt.NewNumericDate(time.Now().Add(s.cfg.Expiration)),
+		IssuedAt:   jwt.NewNumericDate(time.Now()),
+		Issuer:     "mailhive",
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

@@ -2,7 +2,7 @@ package handler
 
 import (
 	"bytes"
-	"encoding/json"
+	json "encoding/json/v2"
 	"net/http"
 	"net/http/httptest"
 
@@ -10,7 +10,7 @@ import (
 )
 
 func newTestContext(method, path string, body any) (*echo.Context, *httptest.ResponseRecorder) {
-	e := echo.New()
+	e := NewEcho()
 	var req *http.Request
 	if body != nil {
 		b, _ := json.Marshal(body)

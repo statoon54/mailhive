@@ -11,6 +11,42 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Modifié — rupture du contrat d'API
+
+Le moteur JSON passe à `encoding/json/v2` (Go 1.27). Trois changements sont
+visibles par les clients de l'API :
+
+- Les **tableaux et objets vides** sont sérialisés `[]` et `{}` au lieu de
+  `null` (champs `rules`, `issues`, `clients`, `links`, `variables`, `data`,
+  `items`). C'est ce que décrivait déjà `openapi.yaml`, dans lequel aucun champ
+  tableau n'est `nullable`.
+- Les caractères **HTML ne sont plus échappés** en `\uXXXX` dans les chaînes :
+  `<b>` est écrit tel quel au lieu de `\u003cb\u003e`. Le JSON reste valide et
+  tout décodeur conforme est indifférent au changement.
+- Une **clé JSON dupliquée** dans un corps de requête est désormais rejetée
+  (400) au lieu d'être silencieusement résolue par la dernière occurrence.
+
+La **tolérance à la casse** des noms de champs est conservée : `{"SUBJECT": …}`
+continue d'alimenter `subject`. Cette tolérance est transitoire et sera retirée
+lors d'une version majeure, avec préavis.
+
+### Ajouté
+
+- Prise en charge de **Go 1.27** (le projet ne compile plus avec une version
+  antérieure).
+
+### Corrigé
+
+- Les erreurs de type dans un corps de requête indiquaient un type attendu vide
+  pour les tableaux et les objets (« Attendu , reçu … »).
+- Le type reçu n'était pas traduit en français (« reçu number » → « reçu
+  nombre »).
+- Le nom du champ fautif est désormais remonté pour les **champs imbriqués**
+  (`to[0].email` était auparavant rapporté sans nom).
+- Sur les endpoints de modification partielle, une **mise à vide explicite**
+  d'un champ texte (`"name": ""`) est correctement transmise ; elle aurait été
+  silencieusement supprimée par la sémantique `omitempty` de json/v2.
+
 ### Documentation
 
 - Démarrage rapide « Make » + exemples d'envoi enrichis (CC/BCC, pièce jointe,
@@ -21,6 +57,11 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 ### Interne
 
 - Alignement mémoire de structs (fieldalignment) — sans impact fonctionnel.
+- Modernisation du code aux idiomes Go 1.27 (`errors.AsType`, `sync.WaitGroup.Go`,
+  `for range n`), vérifiée en CI par `go fix -diff`.
+- CI : actions GitHub remises à niveau, `golangci-lint` via action officielle,
+  `govulncheck`, exécution des tests d'intégration, et `dependabot.yml` pour
+  éviter que le retard se reforme.
 
 ## [0.1.3] - 2026-06-16
 

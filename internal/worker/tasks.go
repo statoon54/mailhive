@@ -1,7 +1,7 @@
 package worker
 
 import (
-	"encoding/json"
+	json "encoding/json/v2"
 	"time"
 
 	"github.com/google/uuid"

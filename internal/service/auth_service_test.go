@@ -101,10 +101,8 @@ func TestAuthService_RefreshToken_Valid(t *testing.T) {
 		TenantID:   uuid.New().String(),
 		TenantSlug: "test",
 		Role:       "tenant",
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
+		ExpiresAt:  jwt.NewNumericDate(time.Now().Add(time.Hour)),
+		IssuedAt:   jwt.NewNumericDate(time.Now()),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, err := token.SignedString([]byte(cfg.Secret))

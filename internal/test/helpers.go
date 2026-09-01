@@ -3,7 +3,7 @@ package test
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	json "encoding/json/v2"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -97,7 +97,7 @@ func DoRequest(e *echo.Echo, method, path string, body any, token string) *httpt
 // DecodeResponse décode la réponse JSON.
 func DecodeResponse(t *testing.T, rec *httptest.ResponseRecorder, target any) {
 	t.Helper()
-	if err := json.NewDecoder(rec.Body).Decode(target); err != nil {
+	if err := json.UnmarshalRead(rec.Body, target); err != nil {
 		t.Fatalf("erreur de décodage de la réponse : %v (body: %s)", err, rec.Body.String())
 	}
 }

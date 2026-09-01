@@ -27,9 +27,14 @@ Voir le `README.md` pour la configuration (`.env.example`) et les sous-commandes
 ```bash
 make build            # compile le frontend puis le binaire Go (avec version)
 make lint             # golangci-lint
+make modernize        # applique les correcteurs d'idiomes du toolchain
 make test-unit        # tests unitaires (sans Docker)
 make test-integration # tests d'intégration (testcontainers, Docker requis)
 ```
+
+La CI échoue si `go fix` a encore des corrections à proposer : lancer
+`make modernize` avant de pousser évite l'aller-retour. Le chemin exclut
+volontairement `frontend/`, qui contient du Go vendored sous `node_modules`.
 
 Côté frontend :
 

@@ -48,12 +48,12 @@ const (
 // Mail représente un mail à envoyer ou envoyé.
 type Mail struct {
 	Metadata       map[string]any    `json:"metadata,omitempty"`
-	ScheduledAt    *time.Time        `json:"scheduled_at,omitempty"`
-	SentAt         *time.Time        `json:"sent_at,omitempty"`
-	SMTPConfigID   *uuid.UUID        `json:"smtp_config_id,omitempty"`
-	SpamScore      *float32          `json:"spam_score,omitempty"`
+	ScheduledAt    *time.Time        `json:"scheduled_at,omitzero"`
+	SentAt         *time.Time        `json:"sent_at,omitzero"`
+	SMTPConfigID   *uuid.UUID        `json:"smtp_config_id,omitzero"`
+	SpamScore      *float32          `json:"spam_score,omitzero"`
 	TemplateData   map[string]string `json:"template_data,omitempty"`
-	TemplateID     *uuid.UUID        `json:"template_id,omitempty"`
+	TemplateID     *uuid.UUID        `json:"template_id,omitzero"`
 	CreatedAt      time.Time         `json:"created_at"`
 	ID             uuid.UUID         `json:"id"`
 	Priority       MailPriority      `json:"priority"`
@@ -163,13 +163,13 @@ func (ft *FlexTime) TimePtr() *time.Time {
 
 // CreateMailRequest contient les données pour composer un mail.
 type CreateMailRequest struct {
-	From         *EmailAddress     `json:"from,omitempty"`
+	From         *EmailAddress     `json:"from,omitzero"`
 	Metadata     map[string]any    `json:"metadata,omitempty"`
-	Priority     *MailPriority     `json:"priority,omitempty"`
-	ScheduledAt  *FlexTime         `json:"scheduled_at,omitempty"`
-	SMTPConfigID *uuid.UUID        `json:"smtp_config_id,omitempty"`
+	Priority     *MailPriority     `json:"priority,omitzero"`
+	ScheduledAt  *FlexTime         `json:"scheduled_at,omitzero"`
+	SMTPConfigID *uuid.UUID        `json:"smtp_config_id,omitzero"`
 	TemplateData map[string]string `json:"template_data,omitempty"`
-	TemplateID   *uuid.UUID        `json:"template_id,omitempty"`
+	TemplateID   *uuid.UUID        `json:"template_id,omitzero"`
 	HTMLBody     string            `json:"html_body,omitempty"`
 	Subject      string            `json:"subject,omitempty"`
 	TextBody     string            `json:"text_body,omitempty"`
@@ -178,7 +178,7 @@ type CreateMailRequest struct {
 	CC           []EmailAddress    `json:"cc,omitempty"             validate:"omitempty,dive"`
 	Tags         []string          `json:"tags,omitempty"`
 	To           []EmailAddress    `json:"to"                       validate:"required,min=1,dive"`
-	Individuel   bool              `json:"individuel,omitempty"`
+	Individuel   bool              `json:"individuel,omitzero"`
 }
 
 // CreateMailBatchResponse représente la réponse lors d'un envoi individuel (N mails créés).
@@ -189,7 +189,7 @@ type CreateMailBatchResponse struct {
 
 // MailListFilter contient les critères de filtrage pour la liste des mails.
 type MailListFilter struct {
-	Status  *MailStatus `json:"status,omitempty"`
+	Status  *MailStatus `json:"status,omitzero"`
 	Query   string      `json:"q,omitempty"`
 	TagMode string      `json:"tag_mode,omitempty"` // "and" (défaut) ou "or"
 	Tags    []string    `json:"tags,omitempty"`

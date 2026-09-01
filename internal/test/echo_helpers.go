@@ -2,16 +2,18 @@ package test
 
 import (
 	"bytes"
-	"encoding/json"
+	json "encoding/json/v2"
 	"net/http"
 	"net/http/httptest"
 
 	"github.com/labstack/echo/v5"
+
+	"github.com/statoon54/mailhive/internal/handler"
 )
 
 // NewTestEchoContext crée un echo.Context de test avec un body JSON optionnel.
 func NewTestEchoContext(method, path string, body any) (*echo.Context, *httptest.ResponseRecorder) {
-	e := echo.New()
+	e := handler.NewEcho()
 	var req *http.Request
 	if body != nil {
 		b, _ := json.Marshal(body)

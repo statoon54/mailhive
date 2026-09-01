@@ -344,7 +344,7 @@ func TestMailService_GetByID(t *testing.T) {
 
 func TestMailService_List(t *testing.T) {
 	s := setupMailTest()
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		id, _ := uuid.NewV7()
 		s.mailRepo.Mails[id] = &domain.Mail{ID: id, TenantID: s.tenantID}
 	}

@@ -221,7 +221,7 @@ Objects are stored in the `mailhive-attachments` bucket under the key `<tenant_i
 ### Prerequisites
 
 - Docker and Docker Compose
-- (Optional, for dev) Go 1.26+, Node.js 24+, Make
+- (Optional, for dev) Go 1.27+, Node.js 24+, Make
 
 ### Quick start
 

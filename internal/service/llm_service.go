@@ -3,7 +3,8 @@ package service
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +12,17 @@ import (
 	"time"
 
 	"github.com/statoon54/mailhive/internal/config"
+)
+
+// thirdPartyJSONOptions relâche les deux durcissements de json/v2 pour les
+// réponses d'API tierces (Ollama, OpenAI et compatibles). Le contrat de ces
+// services n'est pas sous notre contrôle : refuser un document parce qu'une clé
+// est dupliquée ou parce que sa casse diffère transformerait une réponse
+// exploitable en échec de génération. Les payloads que nous produisons nous-mêmes
+// restent soumis aux règles strictes par défaut.
+var thirdPartyJSONOptions = json.JoinOptions(
+	json.MatchCaseInsensitiveNames(true),
+	jsontext.AllowDuplicateNames(true),
 )
 
 // LLMService gère la génération de contenu via un fournisseur LLM.
@@ -151,7 +163,7 @@ func (s *LLMService) generateOllama(
 	}
 
 	var ollamaResp ollamaResponse
-	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
+	if err := json.UnmarshalRead(resp.Body, &ollamaResp, thirdPartyJSONOptions); err != nil {
 		return nil, fmt.Errorf("erreur de décodage de la réponse Ollama : %w", err)
 	}
 
@@ -218,7 +230,7 @@ func (s *LLMService) generateOpenAI(
 	}
 
 	var openaiResp openaiResponse
-	if err := json.NewDecoder(resp.Body).Decode(&openaiResp); err != nil {
+	if err := json.UnmarshalRead(resp.Body, &openaiResp, thirdPartyJSONOptions); err != nil {
 		return nil, fmt.Errorf("erreur de décodage de la réponse : %w", err)
 	}
 

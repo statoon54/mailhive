@@ -2,7 +2,7 @@ package worker
 
 import (
 	"context"
-	"encoding/json"
+	json "encoding/json/v2"
 	"fmt"
 	"testing"
 	"time"
@@ -545,7 +545,7 @@ func TestMailHandler_CachesTenantAndSMTPConfig(t *testing.T) {
 	h := newTestMailHandler(mailRepo, smtpRepo, tenantRepo, tmplRepo, sender, rateLimiter)
 
 	// Deux mails du même tenant/config SMTP, traités successivement.
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		id, _ := uuid.NewV7()
 		mailRepo.Mails[id] = &domain.Mail{
 			ID: id, TenantID: tenantID, SMTPConfigID: &smtpCfgID,

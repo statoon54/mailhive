@@ -46,8 +46,14 @@ var messages = map[Lang]map[string]string{
 		// goTypeToFrench / validation
 		"type.string":  "chaîne de caractères",
 		"type.int":     "entier",
+		"type.int64":   "entier",
+		"type.float32": "nombre décimal",
 		"type.float64": "nombre décimal",
 		"type.bool":    "booléen",
+		"type.number":  "nombre",
+		"type.slice":   "tableau",
+		"type.object":  "objet",
+		"type.null":    "valeur nulle",
 
 		// tagMessages
 		"validation.required":  "Ce champ est requis",
@@ -146,8 +152,14 @@ var messages = map[Lang]map[string]string{
 		// goType
 		"type.string":  "string",
 		"type.int":     "integer",
+		"type.int64":   "integer",
+		"type.float32": "decimal number",
 		"type.float64": "decimal number",
 		"type.bool":    "boolean",
+		"type.number":  "number",
+		"type.slice":   "array",
+		"type.object":  "object",
+		"type.null":    "null",
 
 		// tagMessages
 		"validation.required":  "This field is required",

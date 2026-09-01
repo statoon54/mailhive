@@ -315,7 +315,8 @@ func startAPI(ctx context.Context, cfg *config.Config, pool *pgxpool.Pool, redis
 	analysisHandler := handler.NewAnalysisHandler(analysisService, redisClient)
 
 	// Echo
-	e := echo.New()
+	// NewEcho configure le sérialiseur json/v2 ; echo.New() retomberait sur la v1.
+	e := handler.NewEcho()
 	e.Use(middleware.Recover())
 	e.Use(middleware.RequestLogger())
 	e.Use(middleware.CORS("*"))

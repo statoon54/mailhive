@@ -12,6 +12,7 @@ linters:
     - errorlint # erreurs comparées avec ==/!= au lieu de errors.Is/As
     - unconvert # conversions de types redondantes
     - unparam # paramètres/retours de fonction inutilisés
+    - modernize # idiomes dépassés (errors.AsType, WaitGroup.Go, range sur entier…)
     # Non activés volontairement :
     #   - misspell : faux positifs massifs sur le code bilingue FR (conflit, individuel…)
     #   - revive   : règle exported-comment trop bruyante sur les mocks de test

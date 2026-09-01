@@ -1,0 +1,56 @@
+# Dependabot — l'absence de ce fichier explique le retard accumulé sur les
+# actions GitHub (jusqu'à trois majeures). Regroupe les mises à jour pour éviter
+# une PR par dépendance.
+version: 2
+
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # Les modules golang.org/x bougent ensemble et sans rupture.
+      golang-x:
+        patterns:
+          - "golang.org/x/*"
+      # Les dépendances indirectes de testcontainers/docker sont nombreuses et
+      # sans impact fonctionnel : une seule PR suffit.
+      testing:
+        patterns:
+          - "github.com/testcontainers/*"
+          - "github.com/docker/*"
+          - "github.com/stretchr/*"
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      dev-tooling:
+        dependency-type: development
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "ci(deps)"
+    groups:
+      actions:
+        patterns:
+          - "*"
