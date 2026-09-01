@@ -24,10 +24,8 @@ func generateToken(tenantID, slug, role string) string {
 		TenantID:   tenantID,
 		TenantSlug: slug,
 		Role:       role,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
+		ExpiresAt:  jwt.NewNumericDate(time.Now().Add(time.Hour)),
+		IssuedAt:   jwt.NewNumericDate(time.Now()),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, _ := token.SignedString([]byte(testSecret))

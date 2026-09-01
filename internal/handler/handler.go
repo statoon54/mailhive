@@ -38,8 +38,7 @@ func bindRequest(c *echo.Context, req any) error {
 		return nil
 	}
 
-	var syntaxErr *json.SyntaxError
-	if errors.As(err, &syntaxErr) {
+	if syntaxErr, ok := errors.AsType[*json.SyntaxError](err); ok {
 		return c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error: i18n.T(l, "err.invalid_json"),
 			Fields: []FieldValidationError{
@@ -48,8 +47,7 @@ func bindRequest(c *echo.Context, req any) error {
 		})
 	}
 
-	var typeErr *json.UnmarshalTypeError
-	if errors.As(err, &typeErr) {
+	if typeErr, ok := errors.AsType[*json.UnmarshalTypeError](err); ok {
 		field := typeErr.Field
 		if field == "" {
 			field = i18n.T(l, "err.request_body")

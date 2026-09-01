@@ -243,8 +243,7 @@ func (h *MailHandler) HandleMailSend(ctx context.Context, task *asynq.Task) erro
 		h.cbRegistry.RecordFailure(smtpConfigID)
 
 		// Erreur permanente → fail immédiat sans retry
-		var permErr *domain.SMTPPermanentError
-		if errors.As(err, &permErr) {
+		if _, ok := errors.AsType[*domain.SMTPPermanentError](err); ok {
 			h.failMail(ctx, mail.ID, err.Error())
 			return fmt.Errorf("%w : %w", asynq.SkipRetry, err)
 		}

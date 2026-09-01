@@ -160,7 +160,7 @@ func TestTenantService_List_Pagination(t *testing.T) {
 	repo := mocks.NewMockTenantRepo()
 	svc := NewTenantService(repo)
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		id := uuid.New()
 		repo.Tenants[id] = &domain.Tenant{ID: id, Name: "T"}
 	}

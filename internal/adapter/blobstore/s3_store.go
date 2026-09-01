@@ -148,8 +148,7 @@ func (s *S3Store) objectExists(ctx context.Context, key string) (bool, error) {
 
 // isNotFound détecte l'erreur "objet introuvable" du client minio.
 func isNotFound(err error) bool {
-	var resp minio.ErrorResponse
-	if errors.As(err, &resp) {
+	if resp, ok := errors.AsType[minio.ErrorResponse](err); ok {
 		return resp.Code == "NoSuchKey" || resp.StatusCode == 404
 	}
 	return false
