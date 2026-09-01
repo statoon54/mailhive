@@ -414,7 +414,7 @@ s3 ls s3://mailhive-attachments/ --recursive` (identifiants `mailhive` /
 ### Prérequis
 
 - Docker et Docker Compose
-- (Optionnel pour le dev) Go 1.26+, Node.js 24+, Make
+- (Optionnel pour le dev) Go 1.27+, Node.js 24+, Make
 
 ### Démarrage rapide
 

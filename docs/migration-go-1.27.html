@@ -476,6 +476,7 @@
       <span>Base <b>go 1.25.0</b> · 19 077 LOC</span>
       <span>Build &amp; vet <b>verts</b> avant migration</span>
       <span>Décisions : <b>json/v2 complet</b> · <b>google/uuid conservé</b></span>
+      <span>Casse des champs : <b>tolérance conservée</b></span>
     </div>
   </header>
 
@@ -764,13 +765,14 @@
             <li><code>internal/adapter/postgres/{mail,template,tenant}_repo.go</code> — colonnes JSONB.</li>
             <li><code>internal/service/llm_service.go</code>, <code>internal/middleware/audit.go</code>.</li>
           </ul>
-          <div class="callout" style="margin-top:4px">
-            <div class="cap">Ordre de déploiement</div>
+          <div class="callout" style="margin-top:4px" data-resolved="1">
+            <div class="cap">Ordre de déploiement — vérifié, aucune contrainte</div>
             <p>
-              Les tâches Asynq déjà en file ont été encodées par v1. Le décodage v2 reste
-              compatible <i>tant que</i> la casse des tags correspond exactement — c'est le cas
-              ici, mais la marge est nulle. Purger la file avant bascule, ou déployer le worker
-              après l'API, plutôt que de compter dessus.
+              Cette étape prévoyait de purger la file Asynq par précaution. La mesure la rend
+              inutile : un payload encodé en v1 se décode en v2 <i>et réciproquement</i>, à
+              l'identique. <code>MailSendPayload</code> n'a que deux champs aux tags en casse
+              exacte. Un déploiement progressif ne demande donc ni purge ni ordre particulier
+              entre l'API et le worker.
             </p>
           </div>
         </div>
@@ -811,11 +813,15 @@
         <div class="stage-body">
           <ul class="tight">
             <li>Corriger les deux champs cassants (<code>StatusCode</code>, <code>Individuel</code>).</li>
-            <li>Passer les champs pointeurs (<code>*bool</code>, <code>*int</code>, <code>*float32</code>,
-                <code>*time.Time</code>, <code>*uuid.UUID</code>) en <code>omitzero</code> : le résultat est
-                identique mais l'intention devient lisible.</li>
-            <li>Conserver <code>omitempty</code> sur les chaînes, slices et maps — c'est là que sa
-                sémantique « vide » reste la bonne.</li>
+            <li><b>Correction de ce plan.</b> Passer les champs pointeurs en <code>omitzero</code>
+                n'est pas cosmétique, contrairement à ce qui était annoncé ici : en v1,
+                <code>omitempty</code> sur un pointeur ne teste que la nullité ; en v2, il teste la
+                valeur encodée. Un <code>*string</code> vers <code>""</code> était donc émis par v1 et
+                serait <b>silencieusement supprimé</b> par v2 — soit, sur les endpoints de
+                modification partielle, la disparition d'une mise à vide explicite. Les 44 champs
+                pointeurs passent en <code>omitzero</code>, qui restaure exactement la sémantique v1.</li>
+            <li>Conserver <code>omitempty</code> sur les chaînes, slices et maps non pointeurs —
+                les deux moteurs s'y comportent identiquement.</li>
             <li>Côté React : les tableaux arrivent désormais en <code>[]</code>. Les gardes
                 <code>?? []</code> deviennent superflues ; les retirer est optionnel, le typage
                 TypeScript peut en revanche être resserré.</li>
