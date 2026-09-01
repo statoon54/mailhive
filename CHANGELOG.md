@@ -11,6 +11,8 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.2.0] - 2026-09-01
+
 ### Modifié — rupture du contrat d'API
 
 Le moteur JSON passe à `encoding/json/v2` (Go 1.27). Trois changements sont
@@ -114,7 +116,8 @@ lors d'une version majeure, avec préavis.
   + S3) ; schéma OpenAPI servi via Swagger UI.
 - Documentation bilingue FR/EN.
 
-[Non publié]: https://github.com/statoon54/mailhive/compare/v0.1.3...HEAD
+[Non publié]: https://github.com/statoon54/mailhive/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/statoon54/mailhive/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/statoon54/mailhive/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/statoon54/mailhive/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/statoon54/mailhive/compare/v0.1.0...v0.1.1
