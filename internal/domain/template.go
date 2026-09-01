@@ -33,13 +33,13 @@ type CreateTemplateRequest struct {
 
 // UpdateTemplateRequest contient les données pour modifier un template.
 type UpdateTemplateRequest struct {
-	Name        *string           `json:"name,omitempty"`
-	Slug        *string           `json:"slug,omitempty"`
-	SubjectTmpl *string           `json:"subject_tmpl,omitempty"`
-	TextBody    *string           `json:"text_body,omitempty"`
-	HTMLBody    *string           `json:"html_body,omitempty"`
+	Name        *string           `json:"name,omitzero"`
+	Slug        *string           `json:"slug,omitzero"`
+	SubjectTmpl *string           `json:"subject_tmpl,omitzero"`
+	TextBody    *string           `json:"text_body,omitzero"`
+	HTMLBody    *string           `json:"html_body,omitzero"`
 	Variables   map[string]string `json:"variables,omitempty"`
-	IsActive    *bool             `json:"is_active,omitempty"`
+	IsActive    *bool             `json:"is_active,omitzero"`
 }
 
 // PreviewTemplateRequest contient les données pour prévisualiser un template.

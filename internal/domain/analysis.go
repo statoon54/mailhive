@@ -52,5 +52,5 @@ type LinkStatus struct {
 	Source     string `json:"source"` // "href" ou "src"
 	Status     string `json:"status"` // "ok", "broken", "redirect", "insecure", "timeout", "invalid"
 	URL        string `json:"url"`
-	StatusCode int    `json:"status_code,omitempty"`
+	StatusCode int    `json:"status_code,omitzero"`
 }

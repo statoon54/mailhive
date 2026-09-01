@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"encoding/json"
+	json "encoding/json/v2"
 	"testing"
 	"time"
 
@@ -11,15 +11,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Ces tests figent la forme JSON exacte du contrat d'API public. Ils servent de
-// filet lors de la migration vers encoding/json/v2 : toute différence de sortie
-// doit être une décision explicite (et donc une mise à jour consciente de `want`),
-// jamais un effet de bord silencieux du changement de moteur.
+// Ces tests figent la forme JSON exacte du contrat d'API public, désormais
+// produite par encoding/json/v2. Toute différence de sortie doit être une
+// décision explicite — et donc une mise à jour consciente de `want` — jamais un
+// effet de bord silencieux.
 //
-// Les trois divergences v1 → v2 surveillées ici :
-//   - slice/map nulle sérialisée en `[]`/`{}` plutôt qu'en `null` ;
-//   - `omitempty` qui n'omet plus les zéros numériques et booléens ;
-//   - ordre et présence des champs.
+// Ce qui a changé lors de la migration, et que ces cas verrouillent :
+//   - les slices et maps nulles sortent en `[]` et `{}` au lieu de `null` ;
+//   - `status_code` et `individuel` restent omis à zéro grâce à `omitzero`,
+//     `omitempty` ne l'assurant plus pour les nombres et booléens ;
+//   - les champs pointeurs restent omis quand ils sont nuls, et présents dès
+//     qu'ils sont renseignés — y compris vers une chaîne vide, ce qu'`omitempty`
+//     aurait silencieusement supprimé en v2.
 
 // jsonContractCase décrit une valeur et la sortie JSON attendue pour elle.
 type jsonContractCase struct {
@@ -44,22 +47,22 @@ func TestJSONContract_Analysis(t *testing.T) {
 		{
 			name:  "SpamCheckResult sans règle déclenchée",
 			value: SpamCheckResult{},
-			want:  `{"rules":null,"max_score":0,"score":0,"pass":false}`,
+			want:  `{"rules":[],"max_score":0,"score":0,"pass":false}`,
 		},
 		{
 			name:  "HTMLCheckResult sans problème",
 			value: HTMLCheckResult{},
-			want:  `{"issues":null,"total_count":0}`,
+			want:  `{"issues":[],"total_count":0}`,
 		},
 		{
 			name:  "HTMLCompatIssue sans client concerné",
 			value: HTMLCompatIssue{},
-			want:  `{"selector":"","property":"","description":"","severity":"","clients":null}`,
+			want:  `{"selector":"","property":"","description":"","severity":"","clients":[]}`,
 		},
 		{
 			name:  "LinkCheckResult sans lien",
 			value: LinkCheckResult{},
-			want:  `{"links":null,"total_count":0,"broken_count":0}`,
+			want:  `{"links":[],"total_count":0,"broken_count":0}`,
 		},
 		{
 			// status_code vaut 0 : il doit rester absent. C'est précisément le
@@ -83,7 +86,7 @@ func TestJSONContract_Template(t *testing.T) {
 		{
 			name:  "Template sans variable",
 			value: Template{},
-			want: `{"variables":null,"created_at":"0001-01-01T00:00:00Z",` +
+			want: `{"variables":{},"created_at":"0001-01-01T00:00:00Z",` +
 				`"id":"00000000-0000-0000-0000-000000000000",` +
 				`"tenant_id":"00000000-0000-0000-0000-000000000000",` +
 				`"updated_at":"0001-01-01T00:00:00Z","html_body":"","name":"","slug":"",` +
@@ -92,7 +95,7 @@ func TestJSONContract_Template(t *testing.T) {
 		{
 			name:  "PreviewTemplateRequest sans donnée",
 			value: PreviewTemplateRequest{},
-			want:  `{"data":null}`,
+			want:  `{"data":{}}`,
 		},
 	})
 }
@@ -139,7 +142,37 @@ func TestJSONContract_Mail(t *testing.T) {
 		{
 			name:  "PaginatedList vide",
 			value: PaginatedList[Mail]{},
-			want:  `{"items":null,"total":0,"page":0,"limit":0,"total_pages":0}`,
+			want:  `{"items":[],"total":0,"page":0,"limit":0,"total_pages":0}`,
+		},
+	})
+}
+
+// TestJSONContract_NullablePointers verrouille la sémantique des champs
+// pointeurs des requêtes de modification partielle.
+//
+// La distinction porte tout le sens de ces endpoints : un pointeur nul signifie
+// « ne pas toucher au champ », un pointeur vers la valeur zéro signifie « mettre
+// à vide ». En v2, `omitempty` aurait confondu les deux pour les chaînes — d'où
+// `omitzero` sur tous les champs pointeurs.
+func TestJSONContract_NullablePointers(t *testing.T) {
+	vide := ""
+	faux := false
+
+	runJSONContract(t, []jsonContractCase{
+		{
+			name:  "aucun champ à modifier",
+			value: UpdateTemplateRequest{},
+			want:  `{}`,
+		},
+		{
+			name:  "mise à vide explicite d'une chaîne",
+			value: UpdateTemplateRequest{Name: &vide},
+			want:  `{"name":""}`,
+		},
+		{
+			name:  "désactivation explicite d'un booléen",
+			value: UpdateTemplateRequest{IsActive: &faux},
+			want:  `{"is_active":false}`,
 		},
 	})
 }

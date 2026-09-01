@@ -63,7 +63,7 @@ var ValidMailEncodings = map[MailEncoding]bool{
 
 // SMTPConfig représente une configuration SMTP d'un tenant.
 type SMTPConfig struct {
-	Username   *string      `json:"username,omitempty"`
+	Username   *string      `json:"username,omitzero"`
 	AuthMethod AuthMethod   `json:"auth_method"`
 	Charset    MailCharset  `json:"charset"`
 	CreatedAt  time.Time    `json:"created_at"`
@@ -84,7 +84,7 @@ type SMTPConfig struct {
 
 // CreateSMTPConfigRequest contient les données pour créer une config SMTP.
 type CreateSMTPConfigRequest struct {
-	Username   *string      `json:"username,omitempty"`
+	Username   *string      `json:"username,omitzero"`
 	AuthMethod AuthMethod   `json:"auth_method"        validate:"required,oneof=PLAIN LOGIN CRAM-MD5 NONE"`
 	Charset    MailCharset  `json:"charset"`
 	Encoding   MailEncoding `json:"encoding"`
@@ -100,17 +100,17 @@ type CreateSMTPConfigRequest struct {
 
 // UpdateSMTPConfigRequest contient les données pour modifier une config SMTP.
 type UpdateSMTPConfigRequest struct {
-	Name       *string       `json:"name,omitempty"`
-	Host       *string       `json:"host,omitempty"`
-	Port       *int          `json:"port,omitempty"`
-	Username   *string       `json:"username,omitempty"`
-	Password   *string       `json:"password,omitempty"`
-	AuthMethod *AuthMethod   `json:"auth_method,omitempty"`
-	TLSPolicy  *TLSPolicy    `json:"tls_policy,omitempty"`
-	FromEmail  *string       `json:"from_email,omitempty"`
-	FromName   *string       `json:"from_name,omitempty"`
-	Charset    *MailCharset  `json:"charset,omitempty"`
-	Encoding   *MailEncoding `json:"encoding,omitempty"`
-	IsDefault  *bool         `json:"is_default,omitempty"`
-	IsActive   *bool         `json:"is_active,omitempty"`
+	Name       *string       `json:"name,omitzero"`
+	Host       *string       `json:"host,omitzero"`
+	Port       *int          `json:"port,omitzero"`
+	Username   *string       `json:"username,omitzero"`
+	Password   *string       `json:"password,omitzero"`
+	AuthMethod *AuthMethod   `json:"auth_method,omitzero"`
+	TLSPolicy  *TLSPolicy    `json:"tls_policy,omitzero"`
+	FromEmail  *string       `json:"from_email,omitzero"`
+	FromName   *string       `json:"from_name,omitzero"`
+	Charset    *MailCharset  `json:"charset,omitzero"`
+	Encoding   *MailEncoding `json:"encoding,omitzero"`
+	IsDefault  *bool         `json:"is_default,omitzero"`
+	IsActive   *bool         `json:"is_active,omitzero"`
 }

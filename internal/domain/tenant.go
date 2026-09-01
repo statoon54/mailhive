@@ -15,8 +15,8 @@ type TenantSettings struct {
 	RateBurst          int              `json:"rate_burst"`
 	MaxDestinataires   int              `json:"max_destinataires"`
 	DefaultPriority    MailPriority     `json:"default_priority"`
-	SpamScoreThreshold *float32         `json:"spam_score_threshold,omitempty"`
-	SpamScoreAction    *SpamScoreAction `json:"spam_score_action,omitempty"`
+	SpamScoreThreshold *float32         `json:"spam_score_threshold,omitzero"`
+	SpamScoreAction    *SpamScoreAction `json:"spam_score_action,omitzero"`
 	Language           i18n.Lang        `json:"language,omitempty"`
 	StoreBody          bool             `json:"store_body"`
 }
@@ -72,15 +72,15 @@ type Tenant struct {
 
 // CreateTenantRequest contient les données pour créer un tenant.
 type CreateTenantRequest struct {
-	Settings *TenantSettings `json:"settings,omitempty"`
+	Settings *TenantSettings `json:"settings,omitzero"`
 	Name     string          `json:"name"               validate:"required"`
 	Slug     string          `json:"slug"`
 }
 
 // UpdateTenantRequest contient les données pour modifier un tenant.
 type UpdateTenantRequest struct {
-	Name     *string         `json:"name,omitempty"`
-	Slug     *string         `json:"slug,omitempty"`
-	IsActive *bool           `json:"is_active,omitempty"`
-	Settings *TenantSettings `json:"settings,omitempty"`
+	Name     *string         `json:"name,omitzero"`
+	Slug     *string         `json:"slug,omitzero"`
+	IsActive *bool           `json:"is_active,omitzero"`
+	Settings *TenantSettings `json:"settings,omitzero"`
 }

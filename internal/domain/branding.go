@@ -19,7 +19,7 @@ type LogoData struct {
 
 // UpdateBrandingRequest représente une demande de modification du branding.
 type UpdateBrandingRequest struct {
-	AppTitle    *string `json:"app_title,omitempty"`
-	AppSubtitle *string `json:"app_subtitle,omitempty"`
-	Timezone    *string `json:"timezone,omitempty"`
+	AppTitle    *string `json:"app_title,omitzero"`
+	AppSubtitle *string `json:"app_subtitle,omitzero"`
+	Timezone    *string `json:"timezone,omitzero"`
 }
