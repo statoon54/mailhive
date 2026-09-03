@@ -11,6 +11,33 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.2.1] - 2026-09-03
+
+### Corrigé
+
+- L'endpoint `/health` ne pouvait pas se terminer quand une dépendance était
+  **injoignable** — et non simplement en erreur : la vérification héritait du
+  contexte de la requête, sans échéance, et durait aussi longtemps que la
+  logique de reconnexion du client concerné. Un répartiteur de charge sondant
+  l'endpoint attendait d'autant. La vérification est désormais bornée à deux
+  secondes, au terme desquelles le service se déclare `dégradé`.
+
+### Interne
+
+- Dépendances frontend à jour : axios 1.17 → 1.20, react-router-dom 7.17 → 7.18,
+  recharts 3.8 → 3.10, i18next 26.3 → 26.4, react-i18next 17.0.8 → 17.0.12,
+  React 19.2.7 → 19.2.8, et l'outillage de développement (Vite, ESLint,
+  typescript-eslint, Tailwind).
+- Dépendances Go de test à jour : testcontainers-go 0.41 → 0.44 (dont
+  l'adaptation du port mappé, `Num()` remplaçant `Int()`) et testify 1.11 → 1.12.
+- Les notes de release sont désormais alimentées par la section correspondante
+  de ce fichier, la liste des commits ne signalant pas les ruptures de contrat.
+- `typescript` est sorti du groupe Dependabot `dev-tooling` : sa montée en 7.x
+  sort du `peer` déclaré par typescript-eslint et bloquait les neuf autres
+  montées d'outillage.
+- La suite de tests unitaires passe de ~127 s à moins de 5 s, un seul test en
+  concentrant l'essentiel du temps.
+
 ## [0.2.0] - 2026-09-01
 
 ### Modifié — rupture du contrat d'API
@@ -116,7 +143,8 @@ lors d'une version majeure, avec préavis.
   + S3) ; schéma OpenAPI servi via Swagger UI.
 - Documentation bilingue FR/EN.
 
-[Non publié]: https://github.com/statoon54/mailhive/compare/v0.2.0...HEAD
+[Non publié]: https://github.com/statoon54/mailhive/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/statoon54/mailhive/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/statoon54/mailhive/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/statoon54/mailhive/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/statoon54/mailhive/compare/v0.1.1...v0.1.2
