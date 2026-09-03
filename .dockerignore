@@ -1,0 +1,35 @@
+# Contexte de build Docker.
+#
+# Sans ce fichier, `COPY frontend/ .` écrase le node_modules installé par
+# `npm ci` dans le conteneur par celui de la machine hôte : les bindings natifs
+# (rolldown, esbuild…) sont alors ceux de l'hôte — macOS/arm64 par exemple —
+# et le build échoue dans une image Linux. Le contexte pesait par ailleurs
+# plusieurs centaines de mégaoctets inutiles.
+
+# Dépendances installées dans le conteneur
+node_modules/
+frontend/node_modules/
+
+# Sorties de build reconstruites par le Dockerfile
+frontend/dist/
+bin/
+dist/
+
+# Historique et métadonnées : la version est passée par --build-arg
+.git/
+.github/
+.gitignore
+.dockerignore
+
+# Secrets et configuration locale : ne doivent jamais entrer dans une couche
+.env
+.env.*
+!.env.example
+
+# Fichiers de développement sans usage à la compilation
+*.log
+.DS_Store
+.idea/
+.vscode/
+.claude/
+docker-compose*.yml
