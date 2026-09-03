@@ -7,6 +7,12 @@ vendor/
 tmp/
 frontend/node_modules/
 frontend/dist/
+
+# Sortie de `make build-frontend`, copiée ici pour le go:embed. Seul le marqueur
+# de répertoire est suivi : garder index.html sous git le faisait réécrire à
+# chaque build, salissant l'arbre en permanence.
+internal/frontend/dist/*
+!internal/frontend/dist/.gitkeep
 .DS_Store
 .idea/
 .vscode/
