@@ -42,6 +42,14 @@ updates:
           - "@types/react-dom"
       dev-tooling:
         dependency-type: development
+        # typescript est tenu à l'écart du groupe : la montée en 7.x sort du
+        # « peer » déclaré par typescript-eslint (>=4.8.4 <6.1.0 en 8.69.0),
+        # et `npm ci` échoue alors sur ERESOLVE avant toute compilation. Groupé,
+        # un seul paquet bloquait les neuf autres montées d'outillage.
+        # Le motif vise le nom exact : @typescript-eslint/* et typescript-eslint
+        # restent dans le groupe.
+        exclude-patterns:
+          - "typescript"
 
   - package-ecosystem: github-actions
     directory: /
