@@ -12,6 +12,9 @@ build-frontend:
 	cd frontend && npm run build
 	rm -rf internal/frontend/dist
 	cp -r frontend/dist internal/frontend/dist
+	# Le marqueur est le seul fichier suivi du répertoire : sans lui, le rm -rf
+	# ci-dessus apparaîtrait comme une suppression et salirait l'arbre.
+	touch internal/frontend/dist/.gitkeep
 
 build: build-frontend
 	go build $(LDFLAGS) -o $(BINARY) ./cmd/mailhive
