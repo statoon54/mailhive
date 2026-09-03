@@ -33,15 +33,20 @@ jobs:
       # Notes de release : l'en-tête vient du CHANGELOG, la liste des commits
       # étant générée ensuite par GoReleaser. Sans cet en-tête, une rupture de
       # contrat n'apparaît que comme un « ! » dans un sujet de commit.
+      # Le fichier est écrit hors du dépôt : GoReleaser valide la propreté de
+      # l'arbre git avant d'exécuter ses hooks, et un fichier non suivi à la
+      # racine suffit à faire échouer la publication sur « git is dirty ».
       - name: En-tête des notes depuis le CHANGELOG
         run: |
-          ./scripts/changelog-section.sh "${{ github.ref_name }}" > release-header.md
-          cat release-header.md
+          ./scripts/changelog-section.sh "${{ github.ref_name }}" \
+            > "$RUNNER_TEMP/release-header.md"
+          cat "$RUNNER_TEMP/release-header.md"
+          git status --porcelain
 
       - uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
-          args: release --clean --release-header=release-header.md
+          args: release --clean --release-header=${{ runner.temp }}/release-header.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
