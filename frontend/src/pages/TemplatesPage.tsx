@@ -168,7 +168,16 @@ export default function TemplatesPage() {
       } : null);
     } catch (err) {
       const msg = getApiError(err);
-      setAnalysis((prev) => prev ? { ...prev, loading: false, error: msg } : null);
+      // Le résultat précédent ne décrit plus le template : le laisser afficherait
+      // un verdict périmé juste sous le message d'erreur.
+      setAnalysis((prev) => prev ? {
+        ...prev,
+        loading: false,
+        error: msg,
+        spam: analysis.tab === 'spam' ? undefined : prev.spam,
+        html: analysis.tab === 'html' ? undefined : prev.html,
+        links: analysis.tab === 'link' ? undefined : prev.links,
+      } : null);
     }
   };
 
