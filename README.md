@@ -288,7 +288,7 @@ flowchart TD
 
 | Composant | Technologie | Version |
 | ----------- | ------------- | --------- |
-| **Backend** | Go | 1.26 |
+| **Backend** | Go | 1.27 |
 | **Framework HTTP** | Echo | v5 |
 | **Base de données** | PostgreSQL | 18 |
 | **Driver DB** | pgx | v5 |
