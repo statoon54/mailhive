@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/statoon54/mailhive/internal/domain"
+	"github.com/statoon54/mailhive/internal/templates"
 	"github.com/statoon54/mailhive/internal/test/mocks"
 )
 
@@ -126,4 +128,62 @@ func TestTemplateService_Delete(t *testing.T) {
 	err := svc.Delete(context.Background(), tenantID, tmplID)
 	require.NoError(t, err)
 	assert.True(t, repo.Called("Delete"))
+}
+
+func TestTemplateService_Create_RejetteSyntaxeInvalide(t *testing.T) {
+	repo := mocks.NewMockTemplateRepo()
+	svc := NewTemplateService(repo)
+
+	_, err := svc.Create(context.Background(), uuid.New(), domain.CreateTemplateRequest{
+		Name:        "Test",
+		SubjectTmpl: "Bonjour {{.Prenom}",
+	})
+
+	require.ErrorIs(t, err, domain.ErrValidation)
+	tmplErr, ok := errors.AsType[*templates.Error](err)
+	require.True(t, ok)
+	assert.Equal(t, templates.FieldSubject, tmplErr.Field)
+	assert.False(t, repo.Called("Create"), "un template invalide ne doit pas être enregistré")
+}
+
+func TestTemplateService_Create_RejetteHTMLInvalide(t *testing.T) {
+	repo := mocks.NewMockTemplateRepo()
+	svc := NewTemplateService(repo)
+
+	_, err := svc.Create(context.Background(), uuid.New(), domain.CreateTemplateRequest{
+		Name:        "Test",
+		SubjectTmpl: "Bonjour",
+		HTMLBody:    "<p>{{Prenom}}</p>",
+	})
+
+	require.ErrorIs(t, err, domain.ErrValidation)
+	tmplErr, ok := errors.AsType[*templates.Error](err)
+	require.True(t, ok)
+	assert.Equal(t, templates.FieldHTML, tmplErr.Field)
+}
+
+func TestTemplateService_Update_RejetteSyntaxeInvalide(t *testing.T) {
+	repo := mocks.NewMockTemplateRepo()
+	svc := NewTemplateService(repo)
+	tenantID := uuid.New()
+	tmplID := uuid.New()
+	repo.Templates[tmplID] = &domain.Template{
+		ID:          tmplID,
+		TenantID:    tenantID,
+		Name:        "Valide",
+		SubjectTmpl: "Bonjour",
+		TextBody:    "Bonjour",
+	}
+
+	invalide := "Salut {{.Prenom}"
+	_, err := svc.Update(context.Background(), tenantID, tmplID, domain.UpdateTemplateRequest{
+		TextBody: &invalide,
+	})
+
+	require.ErrorIs(t, err, domain.ErrValidation)
+	tmplErr, ok := errors.AsType[*templates.Error](err)
+	require.True(t, ok)
+	assert.Equal(t, templates.FieldText, tmplErr.Field)
+	assert.False(t, repo.Called("Update"),
+		"le template ne doit pas être écrit en base")
 }
