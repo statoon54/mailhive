@@ -80,3 +80,56 @@ func TestCompiled_RenderHTML_ChampImbriqueSurUneChaine(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, templates.FieldHTML, tmplErr.Field)
 }
+
+func TestError_MessageNormalise(t *testing.T) {
+	// text/template préfixe ses messages de « template: <nom>:<ligne>: » et, pour
+	// une erreur d'exécution, répète le nom dans « executing "<nom>" at ». Le
+	// champ étant déjà porté par Field, ces répétitions sont retirées.
+	tests := []struct {
+		name       string
+		run        func() error
+		wantLine   int
+		wantDetail string
+	}{
+		{
+			name:       "erreur de parsing",
+			run:        func() error { return templates.Validate("", "", "<p>{{.Prenom}</p>") },
+			wantLine:   1,
+			wantDetail: "bad character U+007D '}'",
+		},
+		{
+			name:       "erreur de parsing sur la deuxième ligne",
+			run:        func() error { return templates.Validate("", "", "<p>\n{{.Prenom}\n</p>") },
+			wantLine:   2,
+			wantDetail: "bad character U+007D '}'",
+		},
+		{
+			name: "erreur d'exécution",
+			run: func() error {
+				compiled, err := templates.Compile("", "", "<p>{{.Prenom.Nom}}</p>")
+				if err != nil {
+					return err
+				}
+				_, err = compiled.RenderHTML(map[string]string{"Prenom": "Jean"})
+				return err
+			},
+			wantLine:   1,
+			wantDetail: "<.Prenom.Nom>: can't evaluate field Nom in type string",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.run()
+			require.Error(t, err)
+
+			tmplErr, ok := errors.AsType[*templates.Error](err)
+			require.True(t, ok)
+			assert.Equal(t, templates.FieldHTML, tmplErr.Field)
+			assert.Equal(t, tt.wantLine, tmplErr.Line)
+			assert.Equal(t, tt.wantDetail, tmplErr.Detail)
+			assert.NotContains(t, tmplErr.Detail, templates.FieldHTML,
+				"le nom du champ ne doit pas être répété dans le détail")
+		})
+	}
+}

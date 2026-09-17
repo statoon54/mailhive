@@ -90,7 +90,7 @@ func TestAnalysisHandler_HTMLCheck_TemplateCasse(t *testing.T) {
 	tenantID := uuid.New()
 	tmplID := uuid.New()
 	svc := &mocks.MockAnalysisService{
-		Err: &templates.Error{Field: templates.FieldHTML, Detail: "bad character U+007D '}'"},
+		Err: &templates.Error{Field: templates.FieldHTML, Line: 3, Detail: "bad character U+007D '}'"},
 	}
 	h := NewAnalysisHandler(svc, nil)
 
@@ -107,5 +107,6 @@ func TestAnalysisHandler_HTMLCheck_TemplateCasse(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 	require.Len(t, resp.Fields, 1, "la réponse doit désigner le champ fautif")
 	assert.Equal(t, templates.FieldHTML, resp.Fields[0].Field)
-	assert.Contains(t, resp.Fields[0].Message, "bad character")
+	assert.Equal(t, "ligne 3 : bad character U+007D '}'", resp.Fields[0].Message,
+		"le message doit situer l'erreur sans répéter le nom du champ")
 }

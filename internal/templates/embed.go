@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -47,12 +48,16 @@ const (
 // l'utilisateur, pas dans le serveur, et l'API doit répondre 400 et non 500.
 type Error struct {
 	Field  string // FieldSubject, FieldText ou FieldHTML
-	Detail string // message brut de text/template
+	Detail string // cause, telle que rapportée par text/template
+	Line   int    // ligne fautive dans le champ, 0 si inconnue
 }
 
-// Error retourne le message d'erreur, champ fautif compris.
+// Error retourne le message d'erreur, champ et ligne compris.
 func (e *Error) Error() string {
-	return fmt.Sprintf("%s : %s", e.Field, e.Detail)
+	if e.Line > 0 {
+		return fmt.Sprintf("%s:%d: %s", e.Field, e.Line, e.Detail)
+	}
+	return fmt.Sprintf("%s: %s", e.Field, e.Detail)
 }
 
 // Unwrap rattache l'erreur à domain.ErrValidation.
@@ -60,14 +65,37 @@ func (e *Error) Unwrap() error {
 	return domain.ErrValidation
 }
 
-// newError construit une *Error en retirant le préfixe que text/template ajoute
-// à ses messages (« template: html:1: ... »), inutile pour l'utilisateur.
+// newError normalise le message de text/template pour l'utilisateur.
+//
+// La bibliothèque préfixe tout de « template: <nom>:<ligne>[:<colonne>]: », le
+// nom étant ici celui du champ, et répète ce nom dans les erreurs d'exécution
+// (« executing "<nom>" at <expr>: »). Le champ et la ligne étant portés par la
+// structure, on ne garde que la cause.
 func newError(field string, err error) *Error {
-	detail := err.Error()
-	if _, after, found := strings.Cut(detail, ": "); found {
-		detail = after
+	detail := strings.TrimPrefix(err.Error(), "template: ")
+	detail = strings.TrimPrefix(detail, field+":")
+
+	line, detail := cutPosition(detail)
+	detail = strings.TrimPrefix(detail, fmt.Sprintf("executing %q at ", field))
+
+	return &Error{Field: field, Detail: detail, Line: line}
+}
+
+// cutPosition détache la ligne — et la colonne, présente sur les erreurs
+// d'exécution — du reste du message.
+func cutPosition(detail string) (line int, rest string) {
+	head, after, found := strings.Cut(detail, ":")
+	n, err := strconv.Atoi(head)
+	if !found || err != nil {
+		return 0, strings.TrimSpace(detail)
 	}
-	return &Error{Field: field, Detail: detail}
+
+	if head, afterCol, found := strings.Cut(after, ":"); found {
+		if _, err := strconv.Atoi(head); err == nil {
+			after = afterCol
+		}
+	}
+	return n, strings.TrimSpace(after)
 }
 
 // Validate vérifie que les trois templates d'un modèle de mail sont

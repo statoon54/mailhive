@@ -207,9 +207,13 @@ func handleError(c *echo.Context, err error) error {
 	// Template invalide : on nomme le champ fautif plutôt que de renvoyer le
 	// message générique, pour que le formulaire puisse le mettre en évidence.
 	if tmplErr, ok := errors.AsType[*templates.Error](err); ok {
+		message := tmplErr.Detail
+		if tmplErr.Line > 0 {
+			message = fmt.Sprintf(i18n.T(l, "err.template_line"), tmplErr.Line, tmplErr.Detail)
+		}
 		return c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:  i18n.T(l, "err.template_syntax"),
-			Fields: []FieldValidationError{{Field: tmplErr.Field, Message: tmplErr.Detail}},
+			Fields: []FieldValidationError{{Field: tmplErr.Field, Message: message}},
 		})
 	}
 
