@@ -24,5 +24,7 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // Les tests sont compilés par tsconfig.node.json : ils tournent sous Node, pas dans le navigateur.
+  "exclude": ["src/**/*.test.ts"]
 }

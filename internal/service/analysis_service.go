@@ -49,9 +49,11 @@ func (s *AnalysisService) renderTemplate(
 		return "", "", "", fmt.Errorf("%w : %s", domain.ErrValidation, err.Error())
 	}
 
+	// L'erreur porte déjà le champ fautif et vaut domain.ErrValidation : un
+	// template cassé est une donnée invalide, pas une panne du serveur.
 	compiled, err := templates.Compile(tmpl.SubjectTmpl, tmpl.TextBody, tmpl.HTMLBody)
 	if err != nil {
-		return "", "", "", fmt.Errorf("erreur de compilation du template : %w", err)
+		return "", "", "", err
 	}
 
 	subject, err = compiled.RenderSubject(data)

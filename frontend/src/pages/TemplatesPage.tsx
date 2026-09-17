@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import api, { type Template, type SpamCheckResult, type HTMLCheckResult, type LinkCheckResult } from '../api/client';
 import { useToast } from '../contexts/ToastContext';
@@ -6,6 +6,8 @@ import { getApiError, getFieldErrors } from '../utils/apiError';
 import FormTooltip from '../components/FormTooltip';
 import HtmlEditor from '../components/HtmlEditor';
 import AiGenerateModal from '../components/AiGenerateModal';
+import VariablePicker from '../components/VariablePicker';
+import { undeclaredVariables } from '../utils/templateVars';
 
 type AnalysisTab = 'spam' | 'html' | 'link';
 interface AnalysisState {
@@ -37,6 +39,12 @@ export default function TemplatesPage() {
   const [showAiModal, setShowAiModal] = useState(false);
   const [aiEnabled, setAiEnabled] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisState | null>(null);
+
+  const declaredVars = useMemo(() => Object.keys(form.variables), [form.variables]);
+  const missingVars = useMemo(
+    () => undeclaredVariables(form.variables, form.subject_tmpl, form.text_body, form.html_body),
+    [form.variables, form.subject_tmpl, form.text_body, form.html_body],
+  );
 
   useEffect(() => {
     api.get('/ai/status').then((res) => setAiEnabled(res.data.data?.enabled ?? false)).catch(() => {});
@@ -160,7 +168,16 @@ export default function TemplatesPage() {
       } : null);
     } catch (err) {
       const msg = getApiError(err);
-      setAnalysis((prev) => prev ? { ...prev, loading: false, error: msg } : null);
+      // Le résultat précédent ne décrit plus le template : le laisser afficherait
+      // un verdict périmé juste sous le message d'erreur.
+      setAnalysis((prev) => prev ? {
+        ...prev,
+        loading: false,
+        error: msg,
+        spam: analysis.tab === 'spam' ? undefined : prev.spam,
+        html: analysis.tab === 'html' ? undefined : prev.html,
+        links: analysis.tab === 'link' ? undefined : prev.links,
+      } : null);
     }
   };
 
@@ -188,8 +205,8 @@ export default function TemplatesPage() {
               <Input label={t('templates.name')} value={form.name} onChange={(v) => setForm({ ...form, name: v })} required error={fieldErrors['name']} tooltip={t('templates.tooltip.name')} />
               <Input label={t('templates.slug')} value={form.slug} onChange={(v) => setForm({ ...form, slug: v })} error={fieldErrors['slug']} tooltip={t('templates.tooltip.slug')} />
             </div>
-            <Input label={t('templates.subject_tmpl')} value={form.subject_tmpl} onChange={(v) => setForm({ ...form, subject_tmpl: v })} required error={fieldErrors['subject_tmpl']} tooltip={t('templates.tooltip.subject_tmpl')} />
-            <TextArea label={t('templates.text_body')} value={form.text_body} onChange={(v) => setForm({ ...form, text_body: v })} required error={fieldErrors['text_body']} tooltip={t('templates.tooltip.text_body')} />
+            <Input label={t('templates.subject_tmpl')} value={form.subject_tmpl} onChange={(v) => setForm({ ...form, subject_tmpl: v })} required error={fieldErrors['subject_tmpl']} tooltip={t('templates.tooltip.subject_tmpl')} variables={declaredVars} />
+            <TextArea label={t('templates.text_body')} value={form.text_body} onChange={(v) => setForm({ ...form, text_body: v })} required error={fieldErrors['text_body']} tooltip={t('templates.tooltip.text_body')} variables={declaredVars} />
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-sm font-medium text-gray-700">
@@ -206,7 +223,7 @@ export default function TemplatesPage() {
                   </button>
                 )}
               </div>
-              <HtmlEditor value={form.html_body} onChange={(v) => setForm({ ...form, html_body: v })} error={fieldErrors['html_body']} />
+              <HtmlEditor value={form.html_body} onChange={(v) => setForm({ ...form, html_body: v })} error={fieldErrors['html_body']} variables={declaredVars} />
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
@@ -263,6 +280,25 @@ export default function TemplatesPage() {
                   {t('templates.add')}
                 </button>
               </div>
+
+              {missingVars.length > 0 && (
+                <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+                  <p className="mb-2">{t('templates.undeclared_vars')}</p>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {missingVars.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => setForm({ ...form, variables: { ...form.variables, [name]: '' } })}
+                        title={t('templates.declare_var')}
+                        className="px-2 py-0.5 text-xs font-mono bg-white text-amber-800 border border-amber-300 rounded hover:bg-amber-100 cursor-pointer"
+                      >
+                        {`{{.${name}}}`} +
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2">
@@ -581,14 +617,17 @@ export default function TemplatesPage() {
   );
 }
 
-function Input({ label, value, onChange, required, error, tooltip }: { label: string; value: string; onChange: (v: string) => void; required?: boolean; error?: string; tooltip?: string }) {
+function Input({ label, value, onChange, required, error, tooltip, variables }: { label: string; value: string; onChange: (v: string) => void; required?: boolean; error?: string; tooltip?: string; variables?: string[] }) {
+  const fieldRef = useRef<HTMLInputElement>(null);
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">
         {label}{required && <span className="text-red-500 ml-0.5">*</span>}
         {tooltip && <FormTooltip text={tooltip} />}
       </label>
+      {variables && <VariablePicker variables={variables} fieldRef={fieldRef} value={value} onChange={onChange} />}
       <input
+        ref={fieldRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         required={required}
@@ -616,14 +655,17 @@ function LinkStatusBadge({ status }: { status: string }) {
   return <span className={`px-2 py-0.5 text-xs rounded font-medium ${styles[status] || 'bg-gray-100'}`}>{status}</span>;
 }
 
-function TextArea({ label, value, onChange, required, error, tooltip }: { label: string; value: string; onChange: (v: string) => void; required?: boolean; error?: string; tooltip?: string }) {
+function TextArea({ label, value, onChange, required, error, tooltip, variables }: { label: string; value: string; onChange: (v: string) => void; required?: boolean; error?: string; tooltip?: string; variables?: string[] }) {
+  const fieldRef = useRef<HTMLTextAreaElement>(null);
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">
         {label}{required && <span className="text-red-500 ml-0.5">*</span>}
         {tooltip && <FormTooltip text={tooltip} />}
       </label>
+      {variables && <VariablePicker variables={variables} fieldRef={fieldRef} value={value} onChange={onChange} />}
       <textarea
+        ref={fieldRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         rows={4}

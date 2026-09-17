@@ -17,6 +17,7 @@ import (
 
 	"github.com/statoon54/mailhive/internal/domain"
 	"github.com/statoon54/mailhive/internal/i18n"
+	"github.com/statoon54/mailhive/internal/templates"
 )
 
 // lang extrait la langue depuis l'en-tête Accept-Language de la requête.
@@ -202,6 +203,20 @@ func ok(c *echo.Context, data any) error {
 // handleError traduit une erreur domaine en réponse HTTP appropriée.
 func handleError(c *echo.Context, err error) error {
 	l := lang(c)
+
+	// Template invalide : on nomme le champ fautif plutôt que de renvoyer le
+	// message générique, pour que le formulaire puisse le mettre en évidence.
+	if tmplErr, ok := errors.AsType[*templates.Error](err); ok {
+		message := tmplErr.Detail
+		if tmplErr.Line > 0 {
+			message = fmt.Sprintf(i18n.T(l, "err.template_line"), tmplErr.Line, tmplErr.Detail)
+		}
+		return c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:  i18n.T(l, "err.template_syntax"),
+			Fields: []FieldValidationError{{Field: tmplErr.Field, Message: message}},
+		})
+	}
+
 	switch {
 	case errors.Is(err, domain.ErrTemplateNotFound):
 		return c.JSON(http.StatusNotFound, ErrorResponse{Error: i18n.T(l, "err.template_not_found")})

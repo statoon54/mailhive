@@ -11,6 +11,29 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Ajouté
+
+- Les variables déclarées d'un template s'insèrent d'un clic à la position du
+  curseur, dans le sujet, le corps texte et la source HTML. Le formulaire
+  signale en regard les variables utilisées dans un corps mais jamais déclarées,
+  et propose de les ajouter.
+
+### Corrigé
+
+- Un template dont une variable était mal référencée était enregistré sans
+  broncher, puis faisait répondre « Erreur interne du serveur » au Spam check,
+  au HTML check, au Link check et à l'aperçu. La syntaxe est désormais vérifiée
+  à l'enregistrement — un template invalide est refusé en `400` avec le champ
+  fautif — et les templates déjà cassés en base renvoient un message exploitable
+  au lieu d'un `500`.
+
+### Interne
+
+- Dépendances Go et frontend à jour ; les cinq vulnérabilités remontées par
+  `npm audit` sont résolues.
+- La CI frontend exécute les tests unitaires, écrits pour le lanceur intégré à
+  Node (aucune dépendance de test ajoutée).
+
 ## [0.2.1] - 2026-09-03
 
 ### Corrigé

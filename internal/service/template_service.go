@@ -102,6 +102,11 @@ func (s *TemplateService) Create(ctx context.Context, tenantID uuid.UUID, req do
 		tmpl.Variables = make(map[string]string)
 	}
 
+	// Validé après sanitisation : c'est le HTML réellement stocké qui doit parser.
+	if err := templates.Validate(tmpl.SubjectTmpl, tmpl.TextBody, tmpl.HTMLBody); err != nil {
+		return nil, err
+	}
+
 	if err := s.repo.Create(ctx, tmpl); err != nil {
 		return nil, err
 	}
@@ -148,6 +153,10 @@ func (s *TemplateService) Update(ctx context.Context, tenantID, id uuid.UUID, re
 		tmpl.IsActive = *req.IsActive
 	}
 	tmpl.UpdatedAt = time.Now()
+
+	if err := templates.Validate(tmpl.SubjectTmpl, tmpl.TextBody, tmpl.HTMLBody); err != nil {
+		return nil, err
+	}
 
 	if err := s.repo.Update(ctx, tmpl); err != nil {
 		return nil, err
