@@ -1,15 +1,19 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import VariablePicker from './VariablePicker';
 
 interface HtmlEditorProps {
   value: string;
   onChange: (html: string) => void;
   error?: string;
+  /** Variables déclarées, proposées à l'insertion au-dessus de la source. */
+  variables?: string[];
 }
 
-export default function HtmlEditor({ value, onChange, error }: HtmlEditorProps) {
+export default function HtmlEditor({ value, onChange, error, variables = [] }: HtmlEditorProps) {
   const { t } = useTranslation();
   const [showPreview, setShowPreview] = useState(false);
+  const sourceRef = useRef<HTMLTextAreaElement>(null);
 
   return (
     <div>
@@ -52,12 +56,16 @@ export default function HtmlEditor({ value, onChange, error }: HtmlEditorProps) 
           )}
         </div>
       ) : (
-        <textarea
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          rows={12}
-          className={`w-full px-3 py-2 border rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none ${error ? 'border-red-500' : 'border-gray-300'}`}
-        />
+        <>
+          <VariablePicker variables={variables} fieldRef={sourceRef} value={value} onChange={onChange} />
+          <textarea
+            ref={sourceRef}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            rows={12}
+            className={`w-full px-3 py-2 border rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none ${error ? 'border-red-500' : 'border-gray-300'}`}
+          />
+        </>
       )}
       {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
     </div>
