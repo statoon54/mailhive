@@ -156,7 +156,7 @@ flowchart TD
 
 | Component | Technology | Version |
 | ----------- | ------------- | --------- |
-| **Backend** | Go | 1.26 |
+| **Backend** | Go | 1.27 |
 | **HTTP framework** | Echo | v5 |
 | **Database** | PostgreSQL | 18 |
 | **DB driver** | pgx | v5 |
