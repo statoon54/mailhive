@@ -11,6 +11,8 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.3.0] - 2026-09-17
+
 ### Ajouté
 
 - Les variables déclarées d'un template s'insèrent d'un clic à la position du
@@ -18,14 +20,31 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   signale en regard les variables utilisées dans un corps mais jamais déclarées,
   et propose de les ajouter.
 
+### Modifié
+
+- **Rupture de contrat** : `POST /templates` et `PUT /templates/{id}` refusent
+  désormais en `400` un template dont la syntaxe Go template est invalide, là où
+  ils répondaient `201`/`200`. La réponse nomme le champ fautif (`subject_tmpl`,
+  `text_body` ou `html_body`) et situe la ligne. Un client qui postait des
+  templates invalides sans le savoir verra ces appels échouer.
+
 ### Corrigé
 
 - Un template dont une variable était mal référencée était enregistré sans
   broncher, puis faisait répondre « Erreur interne du serveur » au Spam check,
   au HTML check, au Link check et à l'aperçu. La syntaxe est désormais vérifiée
-  à l'enregistrement — un template invalide est refusé en `400` avec le champ
-  fautif — et les templates déjà cassés en base renvoient un message exploitable
-  au lieu d'un `500`.
+  à l'enregistrement, et les templates déjà cassés en base renvoient un message
+  exploitable au lieu d'un `500`.
+- Après un déploiement, les navigateurs continuaient de servir l'ancienne
+  interface jusqu'à un rechargement forcé. Les fichiers statiques étaient servis
+  sans `Cache-Control` ni validateur — un `embed.FS` rapporte une date de
+  modification nulle, `http.FileServer` ne génère pas d'`ETag` — et le
+  navigateur appliquait sa mise en cache heuristique. Les assets au nom haché
+  sont maintenant conservés un an, `index.html` et les fichiers au nom stable
+  sont revalidés via `ETag`.
+- Après une analyse réussie, une analyse suivante en échec affichait son message
+  d'erreur au-dessus du verdict précédent, toujours vert. Le résultat périmé est
+  désormais retiré.
 
 ### Interne
 
@@ -33,6 +52,8 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
   `npm audit` sont résolues.
 - La CI frontend exécute les tests unitaires, écrits pour le lanceur intégré à
   Node (aucune dépendance de test ajoutée).
+- Le tableau de stack des README annonçait Go 1.26 alors que le projet compile
+  sur 1.27 depuis `bc82efd`.
 
 ## [0.2.1] - 2026-09-03
 
@@ -166,7 +187,8 @@ lors d'une version majeure, avec préavis.
   + S3) ; schéma OpenAPI servi via Swagger UI.
 - Documentation bilingue FR/EN.
 
-[Non publié]: https://github.com/statoon54/mailhive/compare/v0.2.1...HEAD
+[Non publié]: https://github.com/statoon54/mailhive/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/statoon54/mailhive/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/statoon54/mailhive/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/statoon54/mailhive/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/statoon54/mailhive/compare/v0.1.2...v0.1.3
