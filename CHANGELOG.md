@@ -11,6 +11,28 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.3.1] - 2026-10-21
+
+### Sécurité
+
+- `golang.org/x/net` 0.59 → 0.61 corrige cinq vulnérabilités (GO-2026-6603,
+  GO-2026-6610, GO-2026-6611, GO-2026-6612, GO-2026-6617). `govulncheck` ne les
+  voyait pas appelées par le code, mais elles étaient présentes dans le binaire.
+- Vite 8.3.0 → 8.3.5 corrige trois vulnérabilités élevées remontées par
+  `npm audit` (Vite et `launch-editor`). Elles ne touchent que le serveur de
+  développement, pas l'interface embarquée dans le binaire.
+
+### Interne
+
+- Toolchain Go 1.27.3 (`go 1.27.3` dans `go.mod`).
+- Dépendances Go à jour : Echo 5.3 → 5.4, minio-go 7.3 → 7.4, go-redis
+  9.22 → 9.23, validator 10.30.5, klauspost/compress 1.20.3, x/crypto 0.58.0,
+  x/text 0.43.0, x/sync 0.24.0, x/sys 0.49.0.
+- Dépendances frontend à jour dans les bornes semver déclarées (React 19.3.1,
+  ESLint 10.13, i18next 26.5) : seul le lock change.
+- Reste une vulnérabilité de `golang.org/x/crypto` (GO-2026-5932) sans
+  correctif publié ; le code ne l'appelle pas.
+
 ## [0.3.0] - 2026-09-17
 
 ### Ajouté
@@ -187,7 +209,8 @@ lors d'une version majeure, avec préavis.
   + S3) ; schéma OpenAPI servi via Swagger UI.
 - Documentation bilingue FR/EN.
 
-[Non publié]: https://github.com/statoon54/mailhive/compare/v0.3.0...HEAD
+[Non publié]: https://github.com/statoon54/mailhive/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/statoon54/mailhive/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/statoon54/mailhive/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/statoon54/mailhive/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/statoon54/mailhive/compare/v0.1.3...v0.2.0
