@@ -29,3 +29,6 @@ send_2000_mails_individuel.sh
 
 # Sortie de GoReleaser (build local : goreleaser release --skip=publish)
 /dist/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
