@@ -11,6 +11,26 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.3.2] - 2026-11-04
+
+### Sécurité
+
+- `golang.org/x/net` 0.61 → 0.62 corrige deux vulnérabilités (GO-2026-6860,
+  GO-2026-6866). `govulncheck` ne les voit pas appelées par le code, mais les
+  paquets concernés étaient présents dans le binaire.
+
+### Interne
+
+- Echo 5.4.0 → 5.4.4.
+- Dépendances frontend à jour : i18next 26.5.12, react-i18next 17.1.9,
+  react-router-dom 7.18.5 ; outillage @types/node 26.6.6, typescript-eslint
+  8.72.1.
+- Dependabot ignore désormais les montées majeures de `typescript` :
+  typescript-eslint (8.72.1) n'accepte pas encore typescript 7 en peer.
+- Reste GO-2026-5932 (`golang.org/x/crypto`) : le correctif n'existe qu'en
+  pseudo-version, pas encore dans une version publiée ; le code ne l'appelle
+  pas.
+
 ## [0.3.1] - 2026-10-21
 
 ### Sécurité
@@ -209,7 +229,8 @@ lors d'une version majeure, avec préavis.
   + S3) ; schéma OpenAPI servi via Swagger UI.
 - Documentation bilingue FR/EN.
 
-[Non publié]: https://github.com/statoon54/mailhive/compare/v0.3.1...HEAD
+[Non publié]: https://github.com/statoon54/mailhive/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/statoon54/mailhive/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/statoon54/mailhive/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/statoon54/mailhive/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/statoon54/mailhive/compare/v0.2.0...v0.2.1
