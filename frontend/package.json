@@ -13,7 +13,7 @@
   "dependencies": {
     "axios": "^1.20.0",
     "i18next": "^26.5.12",
-    "i18next-browser-languagedetector": "^8.2.1",
+    "i18next-browser-languagedetector": "^8.2.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-i18next": "^17.1.9",
