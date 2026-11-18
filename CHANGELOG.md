@@ -11,6 +11,25 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.3.3] - 2026-11-18
+
+### Sécurité
+
+- Toolchain Go 1.27.3 → 1.27.4 (`go 1.27.4` dans `go.mod`) : corrige
+  GO-2026-6859 dans `net/http` (bibliothèque standard), signalée comme appelée
+  par le code.
+
+### Interne
+
+- Dépendances Go à jour : pgx 5.11 → 5.13, validator 10.30.6, caarlos0/env
+  11.4.2, x/text 0.44.0, x/sync 0.25.0 ; tests : testcontainers-go 0.45.0.
+- Dépendances frontend à jour : i18next 26.5 → 27.1 (majeure), react-i18next
+  17.1.10, i18next-browser-languagedetector 8.2.4, axios 1.21.0 ; outillage
+  Vite 8.3.8, @vitejs/plugin-react 6.3.0, Tailwind CSS 4.3.5, ESLint 10.15,
+  typescript-eslint 8.72.2, globals 17.14.
+- Reste GO-2026-5932 (`golang.org/x/crypto`) : le correctif n'existe toujours
+  qu'en pseudo-version ; le code ne l'appelle pas.
+
 ## [0.3.2] - 2026-11-04
 
 ### Sécurité
@@ -229,7 +248,8 @@ lors d'une version majeure, avec préavis.
   + S3) ; schéma OpenAPI servi via Swagger UI.
 - Documentation bilingue FR/EN.
 
-[Non publié]: https://github.com/statoon54/mailhive/compare/v0.3.2...HEAD
+[Non publié]: https://github.com/statoon54/mailhive/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/statoon54/mailhive/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/statoon54/mailhive/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/statoon54/mailhive/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/statoon54/mailhive/compare/v0.2.1...v0.3.0
