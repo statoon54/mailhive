@@ -11,6 +11,21 @@ et le projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+## [0.3.4] - 2026-11-24
+
+### Sécurité
+
+- `golang.org/x/crypto` 0.58 → 0.59 : GO-2026-5932 est désormais corrigée par
+  une version publiée ; `govulncheck` ne signale plus aucune vulnérabilité.
+
+### Interne
+
+- Dépendances Go à jour : Echo 5.4.4 → 5.4.7, go-mail 0.8.2,
+  klauspost/compress 1.20.5, x/net 0.63.0, x/sys 0.50.0.
+- Dépendances frontend à jour : react-i18next 17.1 → 18.0 (majeure),
+  i18next 27.2.7, recharts 3.11.1, axios 1.21.1 ; outillage typescript-eslint
+  8.74.0.
+
 ## [0.3.3] - 2026-11-18
 
 ### Sécurité
@@ -248,7 +263,8 @@ lors d'une version majeure, avec préavis.
   + S3) ; schéma OpenAPI servi via Swagger UI.
 - Documentation bilingue FR/EN.
 
-[Non publié]: https://github.com/statoon54/mailhive/compare/v0.3.3...HEAD
+[Non publié]: https://github.com/statoon54/mailhive/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/statoon54/mailhive/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/statoon54/mailhive/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/statoon54/mailhive/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/statoon54/mailhive/compare/v0.3.0...v0.3.1
